@@ -9,4 +9,16 @@ export type BankActionKind =
   | 'media_active'
   | 'page_hidden'
   | 'page_visible'
-  | 'visual_challenge_started';
+  | 'visual_challenge_started'
+  | 'keystroke_anomaly_observed'
+  | 'pointer_anomaly_observed'
+  | 'native_tampering_observed'
+  | 'dev_environment_observed'
+  | 'bot_detected'
+  | 'phishing_text_observed'
+  | 'phishing_url_observed'
+  | 'token_injection_observed'
+  | 'client_environment_observed'
+  | 'environment_conflict_observed'
+  | 'device_fingerprint_observed'
+  | 'server_factor_observed';

@@ -1,6 +1,6 @@
 {
   "name": "@deepcode/antifraud-test-harness",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Executable scenario harness for running PRD scenarios against D-bank.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
