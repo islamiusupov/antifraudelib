@@ -194,4 +194,44 @@ describe('DeepFraudStateReducingService', () => {
     expect(clearedState.assessment.score).toBe(0);
     expect(clearedState.assessment.decision.level).toBe('allow');
   });
+
+  it('lowers the assessment when camera verification is added to the challenge scope', () => {
+    const service = new DeepFraudStateReducingService();
+    const initialState = service.createInitialState({
+      userId: 'user-1',
+      consent: 'behavioral',
+      factors: [
+        {
+          kind: 'copy_paste_recipient',
+          contribution: 40,
+          maxContribution: 40,
+          status: 'ok',
+          reasonCodes: ['copy_paste_recipient'],
+        },
+        {
+          kind: 'new_recipient',
+          contribution: 25,
+          maxContribution: 25,
+          status: 'ok',
+          reasonCodes: ['new_recipient_in_flow'],
+        },
+      ],
+    });
+
+    const verifiedState = service.replaceScopeFactors(initialState, 'challenge', [
+      {
+        kind: 'camera_verification',
+        contribution: -20,
+        maxContribution: 20,
+        status: 'ok',
+        reasonCodes: ['camera_verified'],
+        source: 'live',
+      },
+    ]);
+
+    expect(initialState.assessment.score).toBe(65);
+    expect(initialState.assessment.decision.level).toBe('step_up');
+    expect(verifiedState.assessment.score).toBe(45);
+    expect(verifiedState.assessment.decision.level).toBe('monitor');
+  });
 });

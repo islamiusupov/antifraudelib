@@ -34,12 +34,15 @@ export class FactorContributionBuildingService {
   }
 
   private resolveMaxContribution(signal: RiskSignalEntity, definition?: FactorDefinitionEntity): number {
-    return this.normalizeNonNegativeNumber(signal.maxContribution ?? definition?.maxContribution ?? signal.contribution ?? 0);
+    if (signal.maxContribution !== undefined || definition?.maxContribution !== undefined) {
+      return this.normalizeNonNegativeNumber(signal.maxContribution ?? definition?.maxContribution ?? 0);
+    }
+    return Math.abs(this.normalizeNumber(signal.contribution ?? 0));
   }
 
   private resolveContribution(signal: RiskSignalEntity, maxContribution: number): number {
     if (signal.contribution !== undefined) {
-      return this.clamp(this.normalizeNonNegativeNumber(signal.contribution), 0, maxContribution);
+      return this.clamp(this.normalizeNumber(signal.contribution), -maxContribution, maxContribution);
     }
     return this.clamp(maxContribution * this.resolveConfidence(signal.confidence), 0, maxContribution);
   }
@@ -50,8 +53,12 @@ export class FactorContributionBuildingService {
   }
 
   private normalizeNonNegativeNumber(value: number): number {
+    return Math.max(this.normalizeNumber(value), 0);
+  }
+
+  private normalizeNumber(value: number): number {
     if (!Number.isFinite(value)) return 0;
-    return Math.max(value, 0);
+    return value;
   }
 
   private clamp(value: number, min: number, max: number): number {

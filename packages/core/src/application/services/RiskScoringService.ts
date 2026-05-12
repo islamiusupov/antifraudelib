@@ -43,7 +43,7 @@ export class RiskScoringService {
     const status = factor.status ?? 'ok';
     const rawContribution = this.normalizeNumber(factor.contribution);
     const maxContribution = this.normalizeMaxContribution(factor.maxContribution, rawContribution);
-    const contribution = this.isScoringStatus(status) ? this.clamp(rawContribution, 0, maxContribution) : 0;
+    const contribution = this.isScoringStatus(status) ? this.clamp(rawContribution, -maxContribution, maxContribution) : 0;
 
     return {
       kind: factor.kind,
@@ -62,16 +62,21 @@ export class RiskScoringService {
     maxScore: number,
     aggregationLimit: number,
   ): number {
-    const selectedContributions = [...factorContributions]
+    const selectedRiskContributions = [...factorContributions]
+      .filter((factor) => factor.contribution > 0)
       .sort((left, right) => right.contribution - left.contribution)
       .slice(0, aggregationLimit);
-    const total = selectedContributions.reduce((sum, factor) => sum + factor.contribution, 0);
+    const mitigationTotal = factorContributions
+      .filter((factor) => factor.contribution < 0)
+      .reduce((sum, factor) => sum + factor.contribution, 0);
+    const total =
+      selectedRiskContributions.reduce((sum, factor) => sum + factor.contribution, 0) + mitigationTotal;
     return Math.round(this.clamp(total, 0, maxScore));
   }
 
   private normalizeMaxContribution(maxContribution: number | undefined, fallback: number): number {
     if (maxContribution === undefined) {
-      return Math.max(this.normalizeNumber(fallback), 0);
+      return Math.abs(this.normalizeNumber(fallback));
     }
     return Math.max(this.normalizeNumber(maxContribution), 0);
   }

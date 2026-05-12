@@ -38,11 +38,7 @@ export function VisualChallengeGate({
     });
     setCameraState(nextState);
 
-    if (nextState === 'granted') {
-      replaceScopeFactors('challenge', []);
-    } else {
-      replaceScopeFactors('challenge', cameraPermissionRiskFactorBuildingService.build(nextState));
-    }
+    replaceScopeFactors('challenge', cameraPermissionRiskFactorBuildingService.build(nextState));
   }, [
     cameraPermissionRiskFactorBuildingService,
     cameraState,

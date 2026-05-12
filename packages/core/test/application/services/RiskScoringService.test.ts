@@ -166,6 +166,35 @@ describe('RiskScoringService', () => {
     ]);
   });
 
+  it('subtracts mitigation factors after selecting the top risk contributions', () => {
+    const service = new RiskScoringService();
+
+    const result = service.score({
+      scope: 'transaction',
+      aggregationLimit: 2,
+      factors: [
+        factor('copy_paste_recipient', 40, 40, ['copy_paste_recipient']),
+        factor('new_recipient', 25, 25, ['new_recipient_in_flow']),
+        factor('camera_verification', -20, 20, ['camera_verified']),
+        factor('warning_dwell', 20, 20, ['warning_skipped']),
+      ],
+    });
+
+    expect(result.score).toBe(45);
+    expect(result.decision.level).toBe('monitor');
+    expect(result.factorContributions).toEqual([
+      expect.objectContaining({ kind: 'copy_paste_recipient', contribution: 40 }),
+      expect.objectContaining({ kind: 'new_recipient', contribution: 25 }),
+      expect.objectContaining({ kind: 'camera_verification', contribution: -20 }),
+      expect.objectContaining({ kind: 'warning_dwell', contribution: 20 }),
+    ]);
+    expect(result.decision.reasons.map((reason) => reason.code)).toEqual([
+      'copy_paste_recipient',
+      'new_recipient_in_flow',
+      'warning_skipped',
+    ]);
+  });
+
   it('clamps maxScore and aggregationLimit edge values', () => {
     const service = new RiskScoringService();
 

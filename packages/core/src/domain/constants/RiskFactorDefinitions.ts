@@ -48,4 +48,5 @@ export const RISK_FACTOR_DEFINITIONS: FactorDefinitionEntity[] = [
   { kind: 'screen_orientation_change', maxContribution: 10, source: 'paper', tier: 'PAPER' },
   { kind: 'device_fingerprint', maxContribution: 30, source: 'server', tier: 'MOCK' },
   { kind: 'visual_challenge', maxContribution: 50, source: 'live', tier: 'LIVE' },
+  { kind: 'camera_verification', maxContribution: 20, source: 'live', tier: 'LIVE' },
 ];

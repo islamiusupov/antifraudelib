@@ -15,6 +15,7 @@ export type KnownRiskFactorKind =
   | 'client_environment'
   | 'environment_conflicts'
   | 'visual_challenge'
+  | 'camera_verification'
   | 'device_fingerprint'
   | 'amount_anomaly'
   | 'time_of_day_anomaly'

@@ -82,6 +82,29 @@ describe('FactorContributionBuildingService', () => {
     });
   });
 
+  it('keeps explicit negative contributions for mitigation factors', () => {
+    const service = new FactorContributionBuildingService();
+
+    expect(
+      service.build({
+        kind: 'camera_verification',
+        detected: true,
+        contribution: -20,
+        maxContribution: 20,
+        source: 'live',
+        reasonCodes: ['camera_verified'],
+      }),
+    ).toEqual({
+      kind: 'camera_verification',
+      status: 'ok',
+      contribution: -20,
+      maxContribution: 20,
+      reasonCodes: ['camera_verified'],
+      source: 'live',
+      metadata: undefined,
+    });
+  });
+
   it('clamps confidence outside the 0..1 range', () => {
     const service = new FactorContributionBuildingService();
 

@@ -18,12 +18,27 @@ describe('CameraPermissionRiskFactorBuildingService', () => {
     ]);
   });
 
-  it('does not add risk when camera is idle, requesting, or granted', () => {
+  it('does not add risk when camera is idle or requesting', () => {
     const service = new CameraPermissionRiskFactorBuildingService();
 
     expect(service.build('idle')).toEqual([]);
     expect(service.build('requesting')).toEqual([]);
-    expect(service.build('granted')).toEqual([]);
+  });
+
+  it('builds a mitigation factor when camera permission is granted', () => {
+    const service = new CameraPermissionRiskFactorBuildingService();
+
+    expect(service.build('granted')).toEqual([
+      {
+        kind: 'camera_verification',
+        status: 'ok',
+        contribution: -20,
+        maxContribution: 20,
+        reasonCodes: ['camera_verified'],
+        source: 'live',
+        metadata: undefined,
+      },
+    ]);
   });
 
   it('builds a soft visual challenge factor when camera API is unavailable', () => {
