@@ -109,6 +109,37 @@ describe('DBankEventRiskFactorsBuildingService', () => {
     ]);
   });
 
+  it('scores a new recipient small test-payment pattern as monitor ready factors', () => {
+    const service = new DBankEventRiskFactorsBuildingService();
+
+    expect(
+      service.build([
+        event('recipient_created', 100, {
+          serverVerified: true,
+          createdInCurrentSession: true,
+          txCountToRecipient: 0,
+        }),
+        event('transfer_submitted', 500, {
+          amount: 250,
+          paymentPattern: 'test-payment',
+        }),
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        kind: 'new_recipient',
+        contribution: 25,
+        maxContribution: 25,
+        reasonCodes: ['new_recipient_in_flow'],
+      }),
+      expect.objectContaining({
+        kind: 'composite_risk_boost',
+        contribution: 5,
+        maxContribution: 5,
+        reasonCodes: ['new_recipient_small_test_payment_pattern'],
+      }),
+    ]);
+  });
+
   it('scores a three-recipient layering trace as recipient and velocity factors', () => {
     const service = new DBankEventRiskFactorsBuildingService();
 

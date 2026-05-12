@@ -213,6 +213,71 @@ describe('DBankLiveFactorExtractingService', () => {
     ]);
   });
 
+  it('adds only a monitor boost for a new recipient with a small test-payment transfer', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('recipient_created', 100, {
+          serverVerified: true,
+          createdInCurrentSession: true,
+          txCountToRecipient: 0,
+        }),
+        event('transfer_submitted', 500, {
+          amount: 250,
+          paymentPattern: 'test-payment',
+        }),
+      ]),
+    ).toEqual([
+      {
+        kind: 'new_recipient',
+        detected: true,
+        confidence: 1,
+        reasonCodes: ['new_recipient_in_flow'],
+        source: 'server',
+        metadata: {
+          serverVerified: true,
+          createdInCurrentSession: true,
+          txCountToRecipient: 0,
+        },
+      },
+      {
+        kind: 'composite_risk_boost',
+        detected: true,
+        contribution: 5,
+        maxContribution: 5,
+        reasonCodes: ['new_recipient_small_test_payment_pattern'],
+        source: 'server',
+        metadata: {
+          amount: 250,
+          paymentPattern: 'test-payment',
+        },
+      },
+    ]);
+  });
+
+  it('does not add a small test-payment boost without a test-payment marker', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('recipient_created', 100),
+        event('transfer_submitted', 500, { amount: 250 }),
+      ]),
+    ).toEqual([
+      {
+        kind: 'new_recipient',
+        detected: true,
+        confidence: 0.4,
+        reasonCodes: ['new_recipient_ui_only'],
+        source: 'server',
+        metadata: {
+          rawEventKind: 'recipient_created',
+        },
+      },
+    ]);
+  });
+
   it('extracts recipient velocity and velocity anomaly from three new recipients with different amounts in one hour', () => {
     const service = new DBankLiveFactorExtractingService();
 

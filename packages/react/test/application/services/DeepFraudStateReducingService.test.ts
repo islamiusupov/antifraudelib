@@ -283,6 +283,22 @@ describe('DeepFraudStateReducingService', () => {
     expect(state.assessment.decision.level).toBe('step_up');
   });
 
+  it('monitors NRC-11 new recipient with a small test-payment pattern', () => {
+    const service = new DeepFraudStateReducingService();
+
+    const state = service.createInitialState({
+      userId: 'user-1',
+      consent: 'behavioral',
+      factors: [
+        factor('new_recipient', 25, 25, ['new_recipient_in_flow']),
+        factor('composite_risk_boost', 5, 5, ['new_recipient_small_test_payment_pattern']),
+      ],
+    });
+
+    expect(state.assessment.score).toBe(30);
+    expect(state.assessment.decision.level).toBe('monitor');
+  });
+
   it('blocks NRC-04 three new recipients with different amounts in one hour', () => {
     const service = new DeepFraudStateReducingService();
 

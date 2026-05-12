@@ -4,11 +4,16 @@ import type { DBankObservedEventEntity } from '../../domain/dbank/entities/DBank
 const CURRENT_SESSION_NEW_RECIPIENT_BOOST = 35;
 const LAYERING_RECIPIENT_COUNT = 3;
 const LAYERING_WINDOW_MS = 60 * 60 * 1000;
+const SMALL_TEST_PAYMENT_AMOUNT_LIMIT = 500;
+const SMALL_TEST_PAYMENT_MONITOR_BOOST = 5;
+const TEST_PAYMENT_TEXT_PATTERN = /(?:test[-_\s]?payment|probe|verification|micro[-_\s]?transfer|trial[-_\s]?payment)/i;
 
 export class DBankLiveFactorExtractingService {
   extract(events: DBankObservedEventEntity[]): RiskSignalEntity[] {
     const signals: RiskSignalEntity[] = [];
     const hasNewRecipientLayeringPattern = this.hasNewRecipientLayeringPattern(events);
+    const smallTestPaymentEvent = this.findSmallTestPaymentEvent(events);
+    const hasSmallTestPaymentPattern = smallTestPaymentEvent !== undefined;
 
     if (this.hasEvent(events, 'recipient_pasted')) {
       signals.push({
@@ -30,9 +35,12 @@ export class DBankLiveFactorExtractingService {
     }
     const recipientCreatedEvent = events.find((event) => event.kind === 'recipient_created');
     if (recipientCreatedEvent !== undefined) {
-      signals.push(this.newRecipientSignal(recipientCreatedEvent, hasNewRecipientLayeringPattern));
-      if (this.isCurrentSessionUnusedRecipient(recipientCreatedEvent.metadata)) {
+      signals.push(this.newRecipientSignal(recipientCreatedEvent, hasNewRecipientLayeringPattern, hasSmallTestPaymentPattern));
+      if (this.isCurrentSessionUnusedRecipient(recipientCreatedEvent.metadata) && !hasSmallTestPaymentPattern) {
         signals.push(this.currentSessionNewRecipientBoostSignal(recipientCreatedEvent));
+      }
+      if (hasSmallTestPaymentPattern && !hasNewRecipientLayeringPattern) {
+        signals.push(this.smallTestPaymentNewRecipientBoostSignal(smallTestPaymentEvent));
       }
     }
     if (hasNewRecipientLayeringPattern) {
@@ -227,13 +235,27 @@ export class DBankLiveFactorExtractingService {
     return events.some((event) => event.kind === kind);
   }
 
-  private newRecipientSignal(event: DBankObservedEventEntity, hasLayeringPattern = false): RiskSignalEntity {
+  private newRecipientSignal(
+    event: DBankObservedEventEntity,
+    hasLayeringPattern = false,
+    hasSmallTestPaymentPattern = false,
+  ): RiskSignalEntity {
     if (this.isServerVerifiedNewRecipient(event.metadata)) {
       return {
         kind: 'new_recipient',
         detected: true,
         confidence: 1,
         reasonCodes: ['new_recipient_in_flow'],
+        source: 'server',
+        metadata: event.metadata,
+      };
+    }
+    if (hasSmallTestPaymentPattern) {
+      return {
+        kind: 'new_recipient',
+        detected: true,
+        confidence: 1,
+        reasonCodes: ['new_recipient_test_payment_pattern'],
         source: 'server',
         metadata: event.metadata,
       };
@@ -258,6 +280,18 @@ export class DBankLiveFactorExtractingService {
       metadata: {
         rawEventKind: event.kind,
       },
+    };
+  }
+
+  private smallTestPaymentNewRecipientBoostSignal(event: DBankObservedEventEntity): RiskSignalEntity {
+    return {
+      kind: 'composite_risk_boost',
+      detected: true,
+      contribution: SMALL_TEST_PAYMENT_MONITOR_BOOST,
+      maxContribution: SMALL_TEST_PAYMENT_MONITOR_BOOST,
+      reasonCodes: ['new_recipient_small_test_payment_pattern'],
+      source: 'server',
+      metadata: event.metadata,
     };
   }
 
@@ -301,6 +335,23 @@ export class DBankLiveFactorExtractingService {
     return metadata?.hasPreviousUse === false;
   }
 
+  private findSmallTestPaymentEvent(events: DBankObservedEventEntity[]): DBankObservedEventEntity | undefined {
+    const amountEvent = events.find((event) => this.hasSmallPaymentAmount(event.metadata));
+    if (amountEvent === undefined) return undefined;
+    return events.find((event) => this.hasTestPaymentPattern(event.metadata));
+  }
+
+  private hasSmallPaymentAmount(metadata: DBankObservedEventEntity['metadata']): boolean {
+    const amount = this.extractNumberMetadata(metadata, ['amount', 'transferAmount', 'transactionAmount']);
+    return amount !== null && amount > 0 && amount < SMALL_TEST_PAYMENT_AMOUNT_LIMIT;
+  }
+
+  private hasTestPaymentPattern(metadata: DBankObservedEventEntity['metadata']): boolean {
+    if (metadata?.testPaymentPattern === true || metadata?.isTestPayment === true) return true;
+    return this.extractTextMetadata(metadata, ['paymentPattern', 'comment', 'purpose', 'description', 'message', 'remittanceInfo'])
+      .some((value) => TEST_PAYMENT_TEXT_PATTERN.test(value));
+  }
+
   private hasNewRecipientLayeringPattern(events: DBankObservedEventEntity[]): boolean {
     const recipientEvents = events
       .filter((event) => event.kind === 'recipient_created')
@@ -342,6 +393,15 @@ export class DBankLiveFactorExtractingService {
       if (typeof value === 'string' && value.trim() !== '') return value;
     }
     return null;
+  }
+
+  private extractTextMetadata(
+    metadata: DBankObservedEventEntity['metadata'],
+    keys: string[],
+  ): string[] {
+    return keys
+      .map((key) => metadata?.[key])
+      .filter((value): value is string => typeof value === 'string' && value.trim() !== '');
   }
 
   private extractNumberMetadata(

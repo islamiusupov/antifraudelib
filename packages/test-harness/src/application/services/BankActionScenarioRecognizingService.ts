@@ -7,6 +7,9 @@ import { CompositeScenarioRecognizingService } from './CompositeScenarioRecogniz
 
 const LAYERING_RECIPIENT_COUNT = 3;
 const LAYERING_WINDOW_MS = 60 * 60 * 1000;
+const SMALL_TEST_PAYMENT_AMOUNT_LIMIT = 500;
+const SMALL_TEST_PAYMENT_MONITOR_BOOST = 5;
+const TEST_PAYMENT_TEXT_PATTERN = /(?:test[-_\s]?payment|probe|verification|micro[-_\s]?transfer|trial[-_\s]?payment)/i;
 
 export class BankActionScenarioRecognizingService {
   constructor(private readonly compositeScenarioRecognizingService = new CompositeScenarioRecognizingService()) {}
@@ -30,6 +33,8 @@ export class BankActionScenarioRecognizingService {
   ): ScenarioRecognitionEntity[] {
     const recognitions: ScenarioRecognitionEntity[] = [];
     const hasNewRecipientLayeringPattern = this.hasNewRecipientLayeringPattern(actions);
+    const smallTestPaymentAction = this.findSmallTestPaymentAction(actions);
+    const hasSmallTestPaymentPattern = smallTestPaymentAction !== undefined;
 
     if (this.hasAction(actions, 'media_active')) {
       recognitions.push(this.createRecognition('concurrent_media', 1, ['concurrent_media_active'], catalog));
@@ -39,17 +44,32 @@ export class BankActionScenarioRecognizingService {
         this.createRecognition(
           'new_recipient',
           1,
-          hasNewRecipientLayeringPattern ? ['new_recipient_layering_pattern'] : ['new_recipient_in_flow'],
+          this.newRecipientReasonCodes(hasNewRecipientLayeringPattern, hasSmallTestPaymentPattern),
           catalog,
         ),
       );
-      if (this.hasCurrentSessionUnusedRecipient(actions)) {
+      if (this.hasCurrentSessionUnusedRecipient(actions) && !hasSmallTestPaymentPattern) {
         recognitions.push(
           this.createRecognition(
             'composite_risk_boost',
             1,
             ['recipient_added_current_session_no_previous_use'],
             catalog,
+          ),
+        );
+      }
+      if (hasSmallTestPaymentPattern && !hasNewRecipientLayeringPattern) {
+        recognitions.push(
+          this.createRecognition(
+            'composite_risk_boost',
+            1,
+            ['new_recipient_small_test_payment_pattern'],
+            catalog,
+            {
+              contribution: SMALL_TEST_PAYMENT_MONITOR_BOOST,
+              maxContribution: SMALL_TEST_PAYMENT_MONITOR_BOOST,
+              metadata: smallTestPaymentAction.metadata,
+            },
           ),
         );
       }
@@ -130,14 +150,18 @@ export class BankActionScenarioRecognizingService {
     confidence: number,
     reasonCodes: string[],
     catalog: ParsedScenarioCatalogEntity,
+    options: Pick<ScenarioRecognitionEntity, 'contribution' | 'maxContribution' | 'metadata'> = {},
   ): ScenarioRecognitionEntity {
     const candidates = catalog.scenarios.filter((scenario) => scenario.factor === factor);
     return {
       factor,
       confidence,
+      contribution: options.contribution,
+      maxContribution: options.maxContribution,
       reasonCodes,
       candidateScenarioIds: candidates.map((scenario) => scenario.id),
       expectedVerdicts: this.unique(candidates.map((scenario) => scenario.normalizedVerdict)),
+      metadata: options.metadata,
     };
   }
 
@@ -146,13 +170,25 @@ export class BankActionScenarioRecognizingService {
       kind: recognition.factor,
       detected: true,
       confidence: recognition.confidence,
+      contribution: recognition.contribution,
+      maxContribution: recognition.maxContribution,
       reasonCodes: recognition.reasonCodes,
       source: 'live',
+      metadata: recognition.metadata,
     };
   }
 
   private hasAction(actions: BankActionEntity[], kind: BankActionEntity['kind']): boolean {
     return actions.some((action) => action.kind === kind);
+  }
+
+  private newRecipientReasonCodes(
+    hasNewRecipientLayeringPattern: boolean,
+    hasSmallTestPaymentPattern: boolean,
+  ): string[] {
+    if (hasNewRecipientLayeringPattern) return ['new_recipient_layering_pattern'];
+    if (hasSmallTestPaymentPattern) return ['new_recipient_test_payment_pattern'];
+    return ['new_recipient_in_flow'];
   }
 
   private hasCurrentSessionUnusedRecipient(actions: BankActionEntity[]): boolean {
@@ -179,6 +215,23 @@ export class BankActionScenarioRecognizingService {
     const previousUseCount = metadata?.previousUseCount;
     if (typeof previousUseCount === 'number') return previousUseCount <= 0;
     return metadata?.hasPreviousUse === false;
+  }
+
+  private findSmallTestPaymentAction(actions: BankActionEntity[]): BankActionEntity | undefined {
+    const amountAction = actions.find((action) => this.hasSmallPaymentAmount(action.metadata));
+    if (amountAction === undefined) return undefined;
+    return actions.find((action) => this.hasTestPaymentPattern(action.metadata));
+  }
+
+  private hasSmallPaymentAmount(metadata: BankActionEntity['metadata']): boolean {
+    const amount = this.extractNumberMetadata(metadata, ['amount', 'transferAmount', 'transactionAmount']);
+    return amount !== null && amount > 0 && amount < SMALL_TEST_PAYMENT_AMOUNT_LIMIT;
+  }
+
+  private hasTestPaymentPattern(metadata: BankActionEntity['metadata']): boolean {
+    if (metadata?.testPaymentPattern === true || metadata?.isTestPayment === true) return true;
+    return this.extractTextMetadata(metadata, ['paymentPattern', 'comment', 'purpose', 'description', 'message', 'remittanceInfo'])
+      .some((value) => TEST_PAYMENT_TEXT_PATTERN.test(value));
   }
 
   private hasNewRecipientLayeringPattern(actions: BankActionEntity[]): boolean {
@@ -219,6 +272,12 @@ export class BankActionScenarioRecognizingService {
       if (typeof value === 'string' && value.trim() !== '') return value;
     }
     return null;
+  }
+
+  private extractTextMetadata(metadata: BankActionEntity['metadata'], keys: string[]): string[] {
+    return keys
+      .map((key) => metadata?.[key])
+      .filter((value): value is string => typeof value === 'string' && value.trim() !== '');
   }
 
   private extractNumberMetadata(metadata: BankActionEntity['metadata'], keys: string[]): number | null {

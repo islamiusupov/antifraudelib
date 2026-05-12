@@ -185,6 +185,50 @@ describe('BankActionScenarioRecognizingService', () => {
     ]);
   });
 
+  it('recognizes NRC-11 new recipient with a small test-payment pattern as monitor risk signals', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('recipient_created', 100, {
+          createdInCurrentSession: true,
+          txCountToRecipient: 0,
+        }),
+        action('transfer_submitted', 500, {
+          amount: 250,
+          paymentPattern: 'test-payment',
+        }),
+      ],
+      catalog(),
+    );
+
+    expect(result.recognitions).toEqual([
+      expect.objectContaining({
+        factor: 'new_recipient',
+        reasonCodes: ['new_recipient_test_payment_pattern'],
+        candidateScenarioIds: expect.arrayContaining(['NRC-11']),
+      }),
+      expect.objectContaining({
+        factor: 'composite_risk_boost',
+        contribution: 5,
+        maxContribution: 5,
+        reasonCodes: ['new_recipient_small_test_payment_pattern'],
+        candidateScenarioIds: [],
+      }),
+    ]);
+    expect(result.riskSignals).toEqual([
+      expect.objectContaining({
+        kind: 'new_recipient',
+        contribution: undefined,
+      }),
+      expect.objectContaining({
+        kind: 'composite_risk_boost',
+        contribution: 5,
+        maxContribution: 5,
+      }),
+    ]);
+  });
+
   it('recognizes NRC-04 layering from three new recipients with different amounts in one hour', () => {
     const service = new BankActionScenarioRecognizingService();
 
