@@ -72,6 +72,15 @@ export class DBankLiveFactorExtractingService {
         source: 'paper',
       });
     }
+    if (this.hasEvent(events, 'rapid_scroll_observed')) {
+      signals.push({
+        kind: 'pointer_pattern',
+        detected: true,
+        confidence: 0.8,
+        reasonCodes: ['rapid_scroll_pattern'],
+        source: 'paper',
+      });
+    }
     if (this.hasEvent(events, 'native_tampering_observed')) {
       signals.push({
         kind: 'native_tampering',

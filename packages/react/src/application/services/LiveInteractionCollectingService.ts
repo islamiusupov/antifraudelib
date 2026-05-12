@@ -1,14 +1,22 @@
 import type { LiveInteractionCollectingConfigEntity } from '../../domain/live/entities/LiveInteractionCollectingConfigEntity';
 import type { LiveInteractionDomEventEntity, LiveInteractionTargetEntity } from '../../domain/live/entities/LiveInteractionTargetEntity';
 import { PhishingTextPatternMatchingService } from './PhishingTextPatternMatchingService';
+import { SpeechTranscriptCollectingService } from './SpeechTranscriptCollectingService';
 
 type UninstallingLiveInteractionCollection = () => void;
 
 const RECIPIENT_FIELD_PATTERN = /(recipient|beneficiary|iban|account|card|phone|получател|счет|счёт|карта|телефон)/i;
 const CONFIRM_TEXT_PATTERN = /(confirm|continue|submit|pay|transfer|подтверд|продолж|перевести|отправ)/i;
+const DEFAULT_FAST_KEY_INTERVAL_MS = 60;
+const DEFAULT_RAPID_SCROLL_WINDOW_MS = 700;
+const DEFAULT_RAPID_SCROLL_MINIMUM_EVENTS = 4;
+const DEFAULT_RAPID_SCROLL_DELTA_THRESHOLD = 80;
 
 export class LiveInteractionCollectingService {
-  constructor(private readonly phishingTextPatternMatchingService = new PhishingTextPatternMatchingService()) {}
+  constructor(
+    private readonly phishingTextPatternMatchingService = new PhishingTextPatternMatchingService(),
+    private readonly speechTranscriptCollectingService = new SpeechTranscriptCollectingService(),
+  ) {}
 
   install(config: LiveInteractionCollectingConfigEntity): UninstallingLiveInteractionCollection {
     const target = config.target ?? (globalThis as unknown as LiveInteractionTargetEntity);
@@ -18,6 +26,7 @@ export class LiveInteractionCollectingService {
     let previousPointer: { x: number; y: number; atMs: number } | undefined;
     let previousKeyAtMs: number | undefined;
     let fastKeyCount = 0;
+    let rapidScrollTimes: number[] = [];
 
     if (documentTarget !== undefined) {
       const handlePaste = (event: LiveInteractionDomEventEntity) => {
@@ -54,14 +63,28 @@ export class LiveInteractionCollectingService {
           this.emit(config, 'keystroke_anomaly_observed', { reason: 'untrusted_key_event' });
           return;
         }
-        if (previousKeyAtMs !== undefined && atMs - previousKeyAtMs <= (config.fastKeyIntervalMs ?? 8)) {
+        if (previousKeyAtMs !== undefined && atMs - previousKeyAtMs <= (config.fastKeyIntervalMs ?? DEFAULT_FAST_KEY_INTERVAL_MS)) {
           fastKeyCount += 1;
         } else {
           fastKeyCount = 0;
         }
         previousKeyAtMs = atMs;
         if (fastKeyCount >= 3) {
-          this.emit(config, 'keystroke_anomaly_observed', { reason: 'machine_fast_key_intervals' });
+          this.emit(config, 'keystroke_anomaly_observed', { reason: 'fast_key_burst' });
+        }
+      };
+      const handleWheel = (event: LiveInteractionDomEventEntity) => {
+        const delta = Math.max(Math.abs(event.deltaX ?? 0), Math.abs(event.deltaY ?? 0));
+        if (delta < (config.rapidScrollDeltaThreshold ?? DEFAULT_RAPID_SCROLL_DELTA_THRESHOLD)) return;
+        const atMs = this.now(config);
+        const windowMs = config.rapidScrollWindowMs ?? DEFAULT_RAPID_SCROLL_WINDOW_MS;
+        rapidScrollTimes = [...rapidScrollTimes.filter((scrollAtMs) => atMs - scrollAtMs <= windowMs), atMs];
+        if (rapidScrollTimes.length >= (config.rapidScrollMinimumEvents ?? DEFAULT_RAPID_SCROLL_MINIMUM_EVENTS)) {
+          this.emit(config, 'rapid_scroll_observed', {
+            eventCount: rapidScrollTimes.length,
+            windowMs,
+          });
+          rapidScrollTimes = [];
         }
       };
       const handleClick = (event: LiveInteractionDomEventEntity) => {
@@ -69,18 +92,27 @@ export class LiveInteractionCollectingService {
           this.emit(config, 'warning_confirmed');
         }
       };
+      const handleInput = (event: LiveInteractionDomEventEntity) => {
+        this.scanText(config, this.targetText(event.target), 'input');
+      };
 
       documentTarget.addEventListener('paste', handlePaste);
       documentTarget.addEventListener('visibilitychange', handleVisibilityChange);
       documentTarget.addEventListener('pointermove', handlePointerMove);
       documentTarget.addEventListener('keydown', handleKeyDown);
+      documentTarget.addEventListener('wheel', handleWheel);
       documentTarget.addEventListener('click', handleClick);
+      documentTarget.addEventListener('input', handleInput);
+      documentTarget.addEventListener('change', handleInput);
       uninstallers.push(() => {
         documentTarget.removeEventListener('paste', handlePaste);
         documentTarget.removeEventListener('visibilitychange', handleVisibilityChange);
         documentTarget.removeEventListener('pointermove', handlePointerMove);
         documentTarget.removeEventListener('keydown', handleKeyDown);
+        documentTarget.removeEventListener('wheel', handleWheel);
         documentTarget.removeEventListener('click', handleClick);
+        documentTarget.removeEventListener('input', handleInput);
+        documentTarget.removeEventListener('change', handleInput);
       });
     }
 
@@ -106,6 +138,17 @@ export class LiveInteractionCollectingService {
       uninstallers.push(() => observer.disconnect());
     }
 
+    if (config.collectSpeechTranscripts === true) {
+      uninstallers.push(
+        this.speechTranscriptCollectingService.install({
+          onEvent: config.onEvent,
+          target,
+          language: config.speechLanguage,
+          now: config.now,
+        }),
+      );
+    }
+
     return () => {
       uninstallers.reverse().forEach((uninstall) => uninstall());
     };
@@ -113,11 +156,18 @@ export class LiveInteractionCollectingService {
 
   private scanDocumentText(config: LiveInteractionCollectingConfigEntity, target: LiveInteractionTargetEntity): void {
     const text = target.document?.body?.innerText ?? target.document?.body?.textContent ?? '';
+    this.scanText(config, text, 'dom');
+  }
+
+  private scanText(config: LiveInteractionCollectingConfigEntity, text: string, source: string): void {
     if (this.phishingTextPatternMatchingService.hasWarningText(text)) {
-      this.emit(config, 'warning_shown');
+      this.emit(config, 'warning_shown', {
+        source,
+      });
     }
     if (this.phishingTextPatternMatchingService.hasPhishingText(text)) {
       this.emit(config, 'phishing_text_observed', {
+        source,
         textLength: text.length,
       });
     }

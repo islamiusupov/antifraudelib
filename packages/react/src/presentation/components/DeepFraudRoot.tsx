@@ -15,6 +15,11 @@ import type { RiskAssessmentNotificationCallbacksEntity } from '../../domain/com
 import type { DeepFraudConsent } from '../../domain/value-objects/DeepFraudConsent';
 import { DeepFraudContext } from '../context/DeepFraudContext';
 
+type TimedEventEntity<TEvent> = {
+  event: TEvent;
+  receivedAtMs: number;
+};
+
 export type DeepFraudRootProps = {
   userId: string;
   consent: DeepFraudConsent;
@@ -25,6 +30,8 @@ export type DeepFraudRootProps = {
   botDetectionOptions?: Record<string, unknown>;
   interceptBrowserApis?: boolean;
   collectLiveInteractions?: boolean;
+  collectSpeechTranscripts?: boolean;
+  liveSignalTtlMs?: number;
   inspectClientEnvironment?: boolean;
   browserApiAllowedUrls?: Array<string | RegExp>;
   onScore?: RiskAssessmentNotificationCallbacksEntity['onScore'];
@@ -42,6 +49,8 @@ export function DeepFraudRoot({
   botDetectionOptions,
   interceptBrowserApis = true,
   collectLiveInteractions = true,
+  collectSpeechTranscripts = false,
+  liveSignalTtlMs = 30000,
   inspectClientEnvironment = true,
   browserApiAllowedUrls,
   onScore,
@@ -58,8 +67,9 @@ export function DeepFraudRoot({
   const riskAssessmentNotifyingService = useMemo(() => new RiskAssessmentNotifyingService(), []);
   const previousNotificationKey = useRef<string | undefined>(undefined);
   const [sessionCollectorFactors, setSessionCollectorFactors] = useState<RiskFactorEntity[]>([]);
-  const [browserApiEvents, setBrowserApiEvents] = useState<BrowserApiInterceptionEventEntity[]>([]);
-  const [liveInteractionEvents, setLiveInteractionEvents] = useState<LiveInteractionEventEntity[]>([]);
+  const [browserApiEvents, setBrowserApiEvents] = useState<Array<TimedEventEntity<BrowserApiInterceptionEventEntity>>>([]);
+  const [liveInteractionEvents, setLiveInteractionEvents] = useState<Array<TimedEventEntity<LiveInteractionEventEntity>>>([]);
+  const [clockMs, setClockMs] = useState(() => Date.now());
   const [state, setState] = useState(() =>
     stateReducingService.createInitialState({
       userId,
@@ -74,16 +84,16 @@ export function DeepFraudRoot({
     [stateReducingService],
   );
   const browserApiFactors = useMemo(
-    () => browserApiRiskFactorBuildingService.build(browserApiEvents),
-    [browserApiEvents, browserApiRiskFactorBuildingService],
+    () => browserApiRiskFactorBuildingService.build(thisActiveEvents(browserApiEvents, clockMs, liveSignalTtlMs)),
+    [browserApiEvents, browserApiRiskFactorBuildingService, clockMs, liveSignalTtlMs],
   );
   const sessionFactors = useMemo(
     () => [
       ...sessionCollectorFactors,
       ...browserApiFactors,
-      ...liveInteractionRiskFactorBuildingService.build(liveInteractionEvents),
+      ...liveInteractionRiskFactorBuildingService.build(thisActiveEvents(liveInteractionEvents, clockMs, liveSignalTtlMs)),
     ],
-    [browserApiFactors, liveInteractionEvents, liveInteractionRiskFactorBuildingService, sessionCollectorFactors],
+    [browserApiFactors, clockMs, liveInteractionEvents, liveInteractionRiskFactorBuildingService, liveSignalTtlMs, sessionCollectorFactors],
   );
 
   useEffect(() => {
@@ -118,23 +128,29 @@ export function DeepFraudRoot({
 
     return browserApiInterceptionInstallingService.install({
       allowedUrls: browserApiAllowedUrls,
-      onEvent: (event) => setBrowserApiEvents((currentEvents) => [...currentEvents, event]),
+      onEvent: (event) => setBrowserApiEvents((currentEvents) => [...currentEvents, thisTimedEvent(event)]),
     });
   }, [browserApiAllowedUrls, browserApiInterceptionInstallingService, interceptBrowserApis]);
   useEffect(() => {
     if (!collectLiveInteractions) return undefined;
 
     return liveInteractionCollectingService.install({
-      onEvent: (event) => setLiveInteractionEvents((currentEvents) => [...currentEvents, event]),
+      collectSpeechTranscripts,
+      onEvent: (event) => setLiveInteractionEvents((currentEvents) => [...currentEvents, thisTimedEvent(event)]),
     });
-  }, [collectLiveInteractions, liveInteractionCollectingService]);
+  }, [collectLiveInteractions, collectSpeechTranscripts, liveInteractionCollectingService]);
   useEffect(() => {
     if (!inspectClientEnvironment) return;
     const events = clientEnvironmentInspectingService.inspect();
     if (events.length > 0) {
-      setLiveInteractionEvents((currentEvents) => [...currentEvents, ...events]);
+      setLiveInteractionEvents((currentEvents) => [...currentEvents, ...events.map((event) => thisTimedEvent(event))]);
     }
   }, [clientEnvironmentInspectingService, inspectClientEnvironment]);
+  useEffect(() => {
+    if (liveSignalTtlMs <= 0) return undefined;
+    const interval = window.setInterval(() => setClockMs(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [liveSignalTtlMs]);
   useEffect(() => {
     replaceScopeFactors('session', sessionFactors);
   }, [replaceScopeFactors, sessionFactors]);
@@ -157,4 +173,22 @@ export function DeepFraudRoot({
   );
 
   return <DeepFraudContext.Provider value={contextValue}>{children}</DeepFraudContext.Provider>;
+}
+
+function thisTimedEvent<TEvent>(event: TEvent): TimedEventEntity<TEvent> {
+  return {
+    event,
+    receivedAtMs: Date.now(),
+  };
+}
+
+function thisActiveEvents<TEvent>(
+  events: Array<TimedEventEntity<TEvent>>,
+  clockMs: number,
+  ttlMs: number,
+): TEvent[] {
+  if (ttlMs <= 0) return events.map((event) => event.event);
+  return events
+    .filter((event) => clockMs - event.receivedAtMs <= ttlMs)
+    .map((event) => event.event);
 }

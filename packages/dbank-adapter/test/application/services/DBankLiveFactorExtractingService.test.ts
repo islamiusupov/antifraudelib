@@ -67,6 +67,20 @@ describe('DBankLiveFactorExtractingService', () => {
     ]);
   });
 
+  it('extracts rapid nervous scrolling as pointer pattern risk', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(service.extract([event('rapid_scroll_observed', 100)])).toEqual([
+      {
+        kind: 'pointer_pattern',
+        detected: true,
+        confidence: 0.8,
+        reasonCodes: ['rapid_scroll_pattern'],
+        source: 'paper',
+      },
+    ]);
+  });
+
   it('extracts bridge risk signals added by D-bank 0.2.1', () => {
     const service = new DBankLiveFactorExtractingService();
 

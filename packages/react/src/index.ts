@@ -12,9 +12,17 @@ export type { DeepFraudStateEntity } from './domain/common/entities/DeepFraudSta
 export type { LiveInteractionCollectingConfigEntity } from './domain/live/entities/LiveInteractionCollectingConfigEntity';
 export type { LiveInteractionEventEntity } from './domain/live/entities/LiveInteractionEventEntity';
 export type {
+  SpeechRecognitionAlternativeEntity,
+  SpeechRecognitionResultEntity,
+  SpeechRecognitionResultListEntity,
+  SpeechTranscriptCollectingConfigEntity,
+} from './domain/live/entities/SpeechTranscriptCollectingConfigEntity';
+export type {
   LiveInteractionDocumentEntity,
   LiveInteractionDomEventEntity,
   LiveInteractionMutationObserverEntity,
+  LiveInteractionSpeechRecognitionEntity,
+  LiveInteractionSpeechRecognitionEventEntity,
   LiveInteractionTargetEntity,
   LiveInteractionWindowEntity,
 } from './domain/live/entities/LiveInteractionTargetEntity';
@@ -37,6 +45,7 @@ export { LiveInteractionRiskFactorBuildingService } from './application/services
 export { PhishingTextPatternMatchingService } from './application/services/PhishingTextPatternMatchingService';
 export { RiskAssessmentNotifyingService } from './application/services/RiskAssessmentNotifyingService';
 export { SessionSignalCollectingService } from './application/services/SessionSignalCollectingService';
+export { SpeechTranscriptCollectingService } from './application/services/SpeechTranscriptCollectingService';
 export { VisualChallengeCameraRequestingService, type VisualChallengeMediaRequest } from './application/services/VisualChallengeCameraRequestingService';
 export { DecisionBadge } from './presentation/components/DecisionBadge';
 export { DeepFraud } from './presentation/components/DeepFraud';

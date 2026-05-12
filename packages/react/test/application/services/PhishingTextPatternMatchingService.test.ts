@@ -7,7 +7,8 @@ describe('PhishingTextPatternMatchingService', () => {
 
     expect(service.hasPhishingText('Move funds to the safe account and do not tell the bank')).toBe(true);
     expect(service.hasPhishingText('Сотрудник МВД просит перевести деньги на безопасный счет')).toBe(true);
-    expect(service.hasPhishingText('Никому не говорите код из смс')).toBe(true);
+    expect(service.hasPhishingText('Никому не говорите код из СМС')).toBe(true);
+    expect(service.hasPhishingText('Это мошенник, не вешайте трубку')).toBe(true);
   });
 
   it('detects warning copy separately from phishing copy', () => {

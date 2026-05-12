@@ -7,4 +7,9 @@ export type LiveInteractionCollectingConfigEntity = {
   now?: () => number;
   pointerJumpThresholdPx?: number;
   fastKeyIntervalMs?: number;
+  rapidScrollWindowMs?: number;
+  rapidScrollMinimumEvents?: number;
+  rapidScrollDeltaThreshold?: number;
+  collectSpeechTranscripts?: boolean;
+  speechLanguage?: string;
 };

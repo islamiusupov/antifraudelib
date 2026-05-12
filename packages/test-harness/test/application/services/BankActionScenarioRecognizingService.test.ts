@@ -93,6 +93,7 @@ describe('BankActionScenarioRecognizingService', () => {
     ['visual_challenge_started', 'visual_challenge', ['visual_challenge_started']],
     ['keystroke_anomaly_observed', 'keystroke_dynamics', ['keystroke_dynamics_anomaly']],
     ['pointer_anomaly_observed', 'pointer_pattern', ['pointer_pattern_anomaly']],
+    ['rapid_scroll_observed', 'pointer_pattern', ['rapid_scroll_pattern']],
     ['native_tampering_observed', 'native_tampering', ['native_tampering']],
     ['dev_environment_observed', 'dev_environment', ['dev_environment']],
     ['bot_detected', 'bot_detection', ['bot_detection']],

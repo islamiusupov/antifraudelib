@@ -18,7 +18,13 @@ export class LiveInteractionRiskFactorBuildingService {
     if (this.has(events, 'page_hidden') && this.has(events, 'page_visible')) {
       signals.push(this.signal('page_visibility', ['page_visibility_oscillation'], 0.8));
     }
-    this.pushIfPresent(signals, events, 'pointer_anomaly_observed', 'pointer_pattern', ['pointer_pattern_anomaly'], 0.8);
+    const pointerPatternReasonCodes = [
+      ...(this.has(events, 'pointer_anomaly_observed') ? ['pointer_pattern_anomaly'] : []),
+      ...(this.has(events, 'rapid_scroll_observed') ? ['rapid_scroll_pattern'] : []),
+    ];
+    if (pointerPatternReasonCodes.length > 0) {
+      signals.push(this.signal('pointer_pattern', pointerPatternReasonCodes, 0.8));
+    }
     this.pushIfPresent(signals, events, 'keystroke_anomaly_observed', 'keystroke_dynamics', ['keystroke_dynamics_anomaly'], 0.8);
     this.pushIfPresent(signals, events, 'phishing_text_observed', 'phishing_text_dom', ['phishing_text_dom']);
     this.pushIfPresent(signals, events, 'native_tampering_observed', 'native_tampering', ['native_tampering']);

@@ -91,6 +91,59 @@ describe('LiveInteractionCollectingService', () => {
 
     expect(events).toEqual([]);
   });
+
+  it('captures suspicious bank chat input text', () => {
+    const documentTarget = new FakeDocumentTarget();
+    const events: LiveInteractionEventEntity[] = [];
+
+    new LiveInteractionCollectingService().install({
+      target: { document: documentTarget },
+      now: () => 300,
+      onEvent: (event) => events.push(event),
+    });
+
+    documentTarget.dispatch('input', {
+      target: {
+        value: 'В чате банка пишу: это мошенник просит код из СМС',
+      },
+    });
+
+    expect(events.map((event) => event.kind)).toEqual(['warning_shown', 'phishing_text_observed']);
+    expect(events[1]).toMatchObject({
+      kind: 'phishing_text_observed',
+      atMs: 300,
+      metadata: {
+        source: 'input',
+      },
+    });
+  });
+
+  it('captures fast key bursts and rapid nervous scrolling', () => {
+    const documentTarget = new FakeDocumentTarget();
+    const events: LiveInteractionEventEntity[] = [];
+    let now = 100;
+
+    new LiveInteractionCollectingService().install({
+      target: { document: documentTarget },
+      rapidScrollMinimumEvents: 3,
+      now: () => now,
+      onEvent: (event) => events.push(event),
+    });
+
+    [100, 140, 180, 220].forEach((time) => {
+      now = time;
+      documentTarget.dispatch('keydown', { key: '1', isTrusted: true });
+    });
+    [300, 420, 540].forEach((time) => {
+      now = time;
+      documentTarget.dispatch('wheel', { deltaY: 160 });
+    });
+
+    expect(events.map((event) => event.kind)).toEqual([
+      'keystroke_anomaly_observed',
+      'rapid_scroll_observed',
+    ]);
+  });
 });
 
 class FakeDocumentTarget {

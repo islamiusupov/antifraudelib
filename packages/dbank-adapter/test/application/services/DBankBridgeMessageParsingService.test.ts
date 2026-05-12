@@ -52,6 +52,7 @@ describe('DBankBridgeMessageParsingService', () => {
     'visual_challenge_started',
     'keystroke_anomaly_observed',
     'pointer_anomaly_observed',
+    'rapid_scroll_observed',
     'native_tampering_observed',
     'dev_environment_observed',
     'bot_detected',

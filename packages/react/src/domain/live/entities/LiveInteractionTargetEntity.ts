@@ -2,6 +2,8 @@ export type LiveInteractionTargetEntity = {
   document?: LiveInteractionDocumentEntity;
   window?: LiveInteractionWindowEntity;
   MutationObserver?: new (callback: () => void) => LiveInteractionMutationObserverEntity;
+  SpeechRecognition?: new () => LiveInteractionSpeechRecognitionEntity;
+  webkitSpeechRecognition?: new () => LiveInteractionSpeechRecognitionEntity;
   navigator?: {
     userAgent?: string;
     platform?: string;
@@ -43,6 +45,30 @@ export type LiveInteractionDomEventEntity = {
   };
   clientX?: number;
   clientY?: number;
+  deltaX?: number;
+  deltaY?: number;
   key?: string;
   isTrusted?: boolean;
+};
+
+export type LiveInteractionSpeechRecognitionEntity = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult?: (event: LiveInteractionSpeechRecognitionEventEntity) => void;
+  onerror?: () => void;
+  start(): void;
+  stop(): void;
+};
+
+export type LiveInteractionSpeechRecognitionEventEntity = {
+  results: {
+    length: number;
+    [index: number]: {
+      length: number;
+      [index: number]: {
+        transcript: string;
+      };
+    };
+  };
 };

@@ -6,6 +6,7 @@ export type LiveInteractionEventEntity = {
     | 'page_hidden'
     | 'page_visible'
     | 'pointer_anomaly_observed'
+    | 'rapid_scroll_observed'
     | 'keystroke_anomaly_observed'
     | 'phishing_text_observed'
     | 'native_tampering_observed'

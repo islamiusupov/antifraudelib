@@ -1,8 +1,27 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DBankBridgeMessageParsingService, type DBankObservedEventEntity } from '@deepcode/antifraud-dbank-adapter';
-import { DecisionBadge, DeepFraud, DeepFraudRoot, ReasonCodeList, RiskFactorList, RiskMeter, VisualChallengeGate } from '@deepcode/antifraud-react';
+import {
+  DecisionBadge,
+  DeepFraud,
+  DeepFraudRoot,
+  LiveInteractionCollectingService,
+  LiveInteractionRiskFactorBuildingService,
+  ReasonCodeList,
+  RiskFactorList,
+  RiskMeter,
+  VisualChallengeGate,
+  type LiveInteractionEventEntity,
+  type LiveInteractionTargetEntity,
+} from '@deepcode/antifraud-react';
 import { DBankEventRiskFactorsBuildingService } from '../../application/services/DBankEventRiskFactorsBuildingService';
 import type { DemoWorkbenchConfigEntity } from '../../domain/demo/entities/DemoWorkbenchConfigEntity';
+
+const DEMO_SIGNAL_TTL_MS = 30000;
+
+type TimedEventEntity<TEvent> = {
+  event: TEvent;
+  receivedAtMs: number;
+};
 
 export type DBankWorkbenchProps = {
   config: DemoWorkbenchConfigEntity;
@@ -11,25 +30,71 @@ export type DBankWorkbenchProps = {
 export function DBankWorkbench({ config }: DBankWorkbenchProps) {
   const dBankBridgeMessageParsingService = useMemo(() => new DBankBridgeMessageParsingService(), []);
   const dBankEventRiskFactorsBuildingService = useMemo(() => new DBankEventRiskFactorsBuildingService(), []);
-  const [observedEvents, setObservedEvents] = useState<DBankObservedEventEntity[]>([]);
+  const liveInteractionCollectingService = useMemo(() => new LiveInteractionCollectingService(), []);
+  const liveInteractionRiskFactorBuildingService = useMemo(() => new LiveInteractionRiskFactorBuildingService(), []);
+  const iframeCollectorCleanup = useRef<(() => void) | undefined>(undefined);
+  const [observedEvents, setObservedEvents] = useState<Array<TimedEventEntity<DBankObservedEventEntity>>>([]);
+  const [iframeLiveEvents, setIframeLiveEvents] = useState<Array<TimedEventEntity<LiveInteractionEventEntity>>>([]);
+  const [clockMs, setClockMs] = useState(() => Date.now());
+  const activeObservedEvents = useMemo(
+    () => activeEvents(observedEvents, clockMs, DEMO_SIGNAL_TTL_MS),
+    [clockMs, observedEvents],
+  );
+  const activeIframeLiveEvents = useMemo(
+    () => activeEvents(iframeLiveEvents, clockMs, DEMO_SIGNAL_TTL_MS),
+    [clockMs, iframeLiveEvents],
+  );
   const observedFactors = useMemo(
-    () => dBankEventRiskFactorsBuildingService.build(observedEvents),
-    [dBankEventRiskFactorsBuildingService, observedEvents],
+    () => [
+      ...dBankEventRiskFactorsBuildingService.build(activeObservedEvents),
+      ...liveInteractionRiskFactorBuildingService.build(activeIframeLiveEvents),
+    ],
+    [activeIframeLiveEvents, activeObservedEvents, dBankEventRiskFactorsBuildingService, liveInteractionRiskFactorBuildingService],
   );
 
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
       const message = dBankBridgeMessageParsingService.parse(event.data);
       if (message === null) return;
-      setObservedEvents((currentEvents) => [...currentEvents, message.payload]);
+      setObservedEvents((currentEvents) => [...currentEvents, timedEvent(message.payload)]);
     }
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [dBankBridgeMessageParsingService]);
+  useEffect(() => {
+    const interval = window.setInterval(() => setClockMs(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+  useEffect(() => () => iframeCollectorCleanup.current?.(), []);
+
+  const installIframeCollector = useCallback(
+    (iframe: HTMLIFrameElement | null) => {
+      iframeCollectorCleanup.current?.();
+      iframeCollectorCleanup.current = undefined;
+      setIframeLiveEvents([]);
+
+      const target = thisFrameTarget(iframe);
+      if (target === undefined) return;
+
+      iframeCollectorCleanup.current = liveInteractionCollectingService.install({
+        target,
+        fastKeyIntervalMs: 80,
+        rapidScrollWindowMs: 900,
+        rapidScrollMinimumEvents: 3,
+        onEvent: (event) => setIframeLiveEvents((currentEvents) => [...currentEvents, timedEvent(event)]),
+      });
+    },
+    [liveInteractionCollectingService],
+  );
 
   return (
-    <DeepFraudRoot userId={config.userId} consent={config.consent} initialFactors={config.initialFactors}>
+    <DeepFraudRoot
+      userId={config.userId}
+      consent={config.consent}
+      initialFactors={config.initialFactors}
+      collectSpeechTranscripts
+    >
       <main
         className="deepfraud-demo-workbench"
         style={{
@@ -43,6 +108,7 @@ export function DBankWorkbench({ config }: DBankWorkbenchProps) {
             <iframe
               title="D-bank demo"
               src={config.dBank.iframePath}
+              onLoad={(event) => installIframeCollector(event.currentTarget)}
               sandbox="allow-scripts allow-forms allow-same-origin allow-popups"
               style={{
                 border: 0,
@@ -53,7 +119,7 @@ export function DBankWorkbench({ config }: DBankWorkbenchProps) {
             />
           </DeepFraud>
         </section>
-        <aside className="deepfraud-demo-workbench__result" data-dbank-event-count={observedEvents.length}>
+        <aside className="deepfraud-demo-workbench__result" data-dbank-event-count={activeObservedEvents.length}>
           <RiskMeter />
           <DecisionBadge />
           <VisualChallengeGate autoRequest includeAudio />
@@ -63,4 +129,39 @@ export function DBankWorkbench({ config }: DBankWorkbenchProps) {
       </main>
     </DeepFraudRoot>
   );
+}
+
+function timedEvent<TEvent>(event: TEvent): TimedEventEntity<TEvent> {
+  return {
+    event,
+    receivedAtMs: Date.now(),
+  };
+}
+
+function activeEvents<TEvent>(
+  events: Array<TimedEventEntity<TEvent>>,
+  clockMs: number,
+  ttlMs: number,
+): TEvent[] {
+  return events
+    .filter((event) => clockMs - event.receivedAtMs <= ttlMs)
+    .map((event) => event.event);
+}
+
+function thisFrameTarget(iframe: HTMLIFrameElement | null): LiveInteractionTargetEntity | undefined {
+  try {
+    const frameWindow = iframe?.contentWindow;
+    const frameDocument = frameWindow?.document;
+    if (frameWindow === undefined || frameWindow === null || frameDocument === undefined) return undefined;
+
+    const frameRecord = frameWindow as unknown as Record<string, unknown>;
+
+    return {
+      document: frameDocument as unknown as LiveInteractionTargetEntity['document'],
+      window: frameWindow as unknown as LiveInteractionTargetEntity['window'],
+      MutationObserver: frameRecord.MutationObserver as LiveInteractionTargetEntity['MutationObserver'],
+    };
+  } catch {
+    return undefined;
+  }
 }

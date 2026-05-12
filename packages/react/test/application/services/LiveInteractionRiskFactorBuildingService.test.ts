@@ -14,6 +14,7 @@ describe('LiveInteractionRiskFactorBuildingService', () => {
         event('page_hidden', 1000),
         event('page_visible', 1100),
         event('pointer_anomaly_observed', 1200),
+        event('rapid_scroll_observed', 1250),
         event('keystroke_anomaly_observed', 1300),
         event('phishing_text_observed', 1400),
         event('native_tampering_observed', 1500),
@@ -45,6 +46,14 @@ describe('LiveInteractionRiskFactorBuildingService', () => {
         event('page_hidden', 1100),
       ]),
     ).toEqual([]);
+  });
+
+  it('maps rapid nervous scroll to pointer pattern risk', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(service.build([event('rapid_scroll_observed', 100)]).map((factor) => factor.reasonCodes)).toEqual([
+      ['rapid_scroll_pattern'],
+    ]);
   });
 });
 
