@@ -3,6 +3,9 @@ import type { KeystrokeDynamicsInputEntity } from '../../domain/ml/entities/Keys
 import { KeystrokeDynamicsFeatureVectorBuildingService } from './KeystrokeDynamicsFeatureVectorBuildingService';
 import { KeystrokeDynamicsModelScoringService } from './KeystrokeDynamicsModelScoringService';
 
+const ONNX_NOT_USER_MINIMUM_CONFIDENCE = 0.9;
+const ONNX_MATCH_MINIMUM_CONFIDENCE = 0.85;
+
 export class KeystrokeDynamicsClassifyingService {
   constructor(
     private readonly keystrokeDynamicsFeatureVectorBuildingService = new KeystrokeDynamicsFeatureVectorBuildingService(),
@@ -13,7 +16,24 @@ export class KeystrokeDynamicsClassifyingService {
     const features = this.keystrokeDynamicsFeatureVectorBuildingService.build(input);
     const modelScore = this.keystrokeDynamicsModelScoringService.score(features);
     if (modelScore.score < modelScore.threshold) {
-      return this.inactive();
+      return this.inactive(modelScore);
+    }
+
+    if (modelScore.score > ONNX_NOT_USER_MINIMUM_CONFIDENCE) {
+      return {
+        kind: 'keystroke_dynamics',
+        detected: true,
+        confidence: modelScore.score,
+        reasonCodes: ['onnx_not_user_high_confidence'],
+        source: 'live',
+        metadata: {
+          classifier: modelScore.modelId,
+          confidence: modelScore.score,
+          features: modelScore.features,
+          modelScore: modelScore.score,
+          verdict: 'not_user',
+        },
+      };
     }
 
     return {
@@ -24,19 +44,39 @@ export class KeystrokeDynamicsClassifyingService {
       source: 'live',
       metadata: {
         classifier: modelScore.modelId,
+        confidence: modelScore.score,
         modelScore: modelScore.score,
         features: modelScore.features,
+        verdict: 'not_user',
       },
     };
   }
 
-  private inactive(): RiskSignalEntity {
+  private inactive(modelScore: ReturnType<KeystrokeDynamicsModelScoringService['score']>): RiskSignalEntity {
+    const matchConfidence = this.round(1 - modelScore.score);
+    const reasonCodes = ['local_baseline_scaled_manhattan_match'];
+    if (matchConfidence > ONNX_MATCH_MINIMUM_CONFIDENCE) {
+      reasonCodes.push('onnx_user_match_high_confidence');
+    }
     return {
       kind: 'keystroke_dynamics',
       detected: false,
       confidence: 0,
-      reasonCodes: [],
+      reasonCodes,
       source: 'live',
+      metadata: {
+        classifier: modelScore.modelId,
+        confidence: matchConfidence,
+        features: modelScore.features,
+        modelScore: modelScore.score,
+        scaledManhattanDistance: modelScore.features.meanRelativeDeviation,
+        threshold: modelScore.threshold,
+        verdict: matchConfidence > ONNX_MATCH_MINIMUM_CONFIDENCE ? 'match' : 'baseline_match',
+      },
     };
+  }
+
+  private round(value: number): number {
+    return Math.round(value * 10000) / 10000;
   }
 }

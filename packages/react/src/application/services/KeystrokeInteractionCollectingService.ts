@@ -9,10 +9,13 @@ type KeystrokeTargetState = {
 
 type KeystrokeInteractionCollectingState = {
   activeKeyDowns: Map<string, number[]>;
+  characterKeys: string[];
   emittedReasonCodes: Set<string>;
   fastKeyCount: number;
   holdDurations: number[];
   intervals: number[];
+  ngramMismatchCount: number;
+  ngramSampleCount: number;
   previousCharacterKeyAtMs?: number;
   previousKeyAtMs?: number;
   targetStates: WeakMap<object, KeystrokeTargetState>;
@@ -20,7 +23,12 @@ type KeystrokeInteractionCollectingState = {
 
 export type KeystrokeInteractionCollectingConfig = Pick<
   LiveInteractionCollectingConfigEntity,
-  'fastKeyIntervalMs' | 'now' | 'onEvent'
+  'fastKeyIntervalMs' |
+  'keystrokeExpectedNgrams' |
+  'keystrokeNgramMinimumSamples' |
+  'keystrokeNgramSize' |
+  'now' |
+  'onEvent'
 > & {
   isCorrectionExpectedTarget(target: unknown): boolean;
 };
@@ -34,17 +42,28 @@ const KEYSTROKE_UNIFORM_INTERVAL_MS = 100;
 const KEYSTROKE_UNIFORM_TOLERANCE_MS = 5;
 const KEYSTROKE_SHORT_HOLD_MAXIMUM_MS = 30;
 const KEYSTROKE_HOLD_MINIMUM_SAMPLES = 4;
+const KEYSTROKE_BIMODAL_MINIMUM_INTERVALS = 6;
+const KEYSTROKE_BIMODAL_SHORT_MAXIMUM_MS = 180;
+const KEYSTROKE_BIMODAL_LONG_MINIMUM_MS = 500;
+const KEYSTROKE_BIMODAL_ALTERNATION_RATIO = 0.8;
 const ERROR_FREE_TYPING_MINIMUM_KEYS = 12;
 const KEYSTROKE_SAMPLE_LIMIT = 8;
+const KEYSTROKE_DEFAULT_NGRAM_SIZE = 2;
+const KEYSTROKE_NGRAM_SAMPLE_LIMIT = 12;
+const KEYSTROKE_NGRAM_MINIMUM_SAMPLES = 4;
+const KEYSTROKE_NGRAM_MISMATCH_RATIO = 0.75;
 
 export class KeystrokeInteractionCollectingService {
   createState(): KeystrokeInteractionCollectingState {
     return {
       activeKeyDowns: new Map(),
+      characterKeys: [],
       emittedReasonCodes: new Set(),
       fastKeyCount: 0,
       holdDurations: [],
       intervals: [],
+      ngramMismatchCount: 0,
+      ngramSampleCount: 0,
       targetStates: new WeakMap(),
     };
   }
@@ -56,7 +75,7 @@ export class KeystrokeInteractionCollectingService {
   ): void {
     const atMs = this.now(config);
     if (event.isTrusted === false) {
-      this.emitAnomaly(config, state, 'untrusted_key_event');
+      this.emitAnomaly(config, state, 'selenium_sendkeys_signature');
       return;
     }
 
@@ -119,8 +138,10 @@ export class KeystrokeInteractionCollectingService {
       state.intervals = this.appendSample(state.intervals, atMs - state.previousCharacterKeyAtMs);
       this.detectLongKeystrokePauses(config, state);
       this.detectUniformKeystrokeIntervals(config, state);
+      this.detectBimodalKeystrokeIntervals(config, state);
     }
     state.previousCharacterKeyAtMs = atMs;
+    this.recordNgramPattern(config, state, key);
     const keyId = this.keystrokeKeyId(key);
     state.activeKeyDowns.set(keyId, [...(state.activeKeyDowns.get(keyId) ?? []), atMs]);
   }
@@ -174,6 +195,72 @@ export class KeystrokeInteractionCollectingService {
         intervals: state.intervals,
       });
     }
+  }
+
+  private detectBimodalKeystrokeIntervals(
+    config: KeystrokeInteractionCollectingConfig,
+    state: KeystrokeInteractionCollectingState,
+  ): void {
+    if (state.intervals.length < KEYSTROKE_BIMODAL_MINIMUM_INTERVALS) return;
+    const buckets = state.intervals.map((interval) => {
+      if (interval <= KEYSTROKE_BIMODAL_SHORT_MAXIMUM_MS) return 'short';
+      if (interval >= KEYSTROKE_BIMODAL_LONG_MINIMUM_MS) return 'long';
+      return 'middle';
+    });
+    if (buckets.includes('middle')) return;
+    if (!buckets.includes('short') || !buckets.includes('long')) return;
+    const alternatingCount = buckets
+      .slice(1)
+      .filter((bucket, index) => bucket !== buckets[index])
+      .length;
+    const alternationRatio = alternatingCount / (buckets.length - 1);
+    if (alternationRatio < KEYSTROKE_BIMODAL_ALTERNATION_RATIO) return;
+    this.emitAnomaly(config, state, 'bimodal_inter_key_timing', {
+      alternationRatio,
+      intervals: state.intervals,
+    });
+  }
+
+  private recordNgramPattern(
+    config: KeystrokeInteractionCollectingConfig,
+    state: KeystrokeInteractionCollectingState,
+    key: string | undefined,
+  ): void {
+    if (key === undefined || key.length !== 1 || config.keystrokeExpectedNgrams === undefined) return;
+    const expectedNgrams = new Set(config.keystrokeExpectedNgrams.map((value) => value.toLowerCase()));
+    if (expectedNgrams.size === 0) return;
+    const ngramSize = config.keystrokeNgramSize ?? KEYSTROKE_DEFAULT_NGRAM_SIZE;
+    if (ngramSize < 1) return;
+    state.characterKeys = [...state.characterKeys, key.toLowerCase()].slice(-Math.max(
+      KEYSTROKE_NGRAM_SAMPLE_LIMIT,
+      ngramSize,
+    ));
+    if (state.characterKeys.length < ngramSize) return;
+
+    const ngram = state.characterKeys.slice(-ngramSize).join('');
+    state.ngramSampleCount += 1;
+    if (!expectedNgrams.has(ngram)) {
+      state.ngramMismatchCount += 1;
+    }
+    this.detectNgramProfileMismatch(config, state, expectedNgrams, ngramSize);
+  }
+
+  private detectNgramProfileMismatch(
+    config: KeystrokeInteractionCollectingConfig,
+    state: KeystrokeInteractionCollectingState,
+    expectedNgrams: Set<string>,
+    ngramSize: number,
+  ): void {
+    const minimumSamples = config.keystrokeNgramMinimumSamples ?? KEYSTROKE_NGRAM_MINIMUM_SAMPLES;
+    if (state.ngramSampleCount < minimumSamples) return;
+    const mismatchRatio = state.ngramMismatchCount / state.ngramSampleCount;
+    if (mismatchRatio < KEYSTROKE_NGRAM_MISMATCH_RATIO) return;
+    this.emitAnomaly(config, state, 'ngram_profile_mismatch', {
+      expectedNgramCount: expectedNgrams.size,
+      mismatchRatio,
+      ngramSize,
+      sampleCount: state.ngramSampleCount,
+    });
   }
 
   private detectMissingTypingCorrections(

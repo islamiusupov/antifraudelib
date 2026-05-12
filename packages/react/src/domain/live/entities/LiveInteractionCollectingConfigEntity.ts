@@ -12,6 +12,9 @@ export type LiveInteractionCollectingConfigEntity = {
   rapidScrollDeltaThreshold?: number;
   clickBurstWindowMs?: number;
   clickBurstMinimumEvents?: number;
+  keystrokeExpectedNgrams?: string[];
+  keystrokeNgramSize?: number;
+  keystrokeNgramMinimumSamples?: number;
   collectSpeechTranscripts?: boolean;
   speechLanguage?: string;
 };

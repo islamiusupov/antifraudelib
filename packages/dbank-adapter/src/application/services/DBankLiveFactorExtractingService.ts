@@ -110,7 +110,7 @@ export class DBankLiveFactorExtractingService {
     }
     signals.push(...this.keystrokeDynamicsSignalBuildingService.build(
       this.eventReasonCodes(events, 'keystroke_anomaly_observed', 'keystroke_dynamics_anomaly'),
-      { eventCount: this.countEvents(events, 'keystroke_anomaly_observed') },
+      this.eventMetadata(events, 'keystroke_anomaly_observed'),
     ));
     if (this.hasEvent(events, 'pointer_anomaly_observed')) {
       signals.push({
@@ -387,6 +387,21 @@ export class DBankLiveFactorExtractingService {
       ], []);
   }
 
+  private eventMetadata(
+    events: DBankObservedEventEntity[],
+    kind: DBankObservedEventEntity['kind'],
+  ): Record<string, unknown> {
+    const observations = events
+      .filter((event) => event.kind === kind && this.isMetadataRecord(event.metadata))
+      .map((event) => event.metadata as Record<string, unknown>);
+    const latestMetadata = observations.length > 0 ? observations[observations.length - 1] : {};
+    return {
+      ...latestMetadata,
+      eventCount: this.countEvents(events, kind),
+      observations,
+    };
+  }
+
   private metadataReasonCodes(metadata: DBankObservedEventEntity['metadata'], fallback: string): string[] {
     const reason = metadata?.reason;
     if (typeof reason === 'string' && reason.trim() !== '') return [reason];
@@ -396,6 +411,10 @@ export class DBankLiveFactorExtractingService {
       if (validReasonCodes.length > 0) return validReasonCodes;
     }
     return [fallback];
+  }
+
+  private isMetadataRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 
   private hasNewRecipientLayeringPattern(events: DBankObservedEventEntity[]): boolean {

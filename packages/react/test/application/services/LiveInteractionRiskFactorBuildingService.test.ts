@@ -107,6 +107,47 @@ describe('LiveInteractionRiskFactorBuildingService', () => {
     ]);
   });
 
+  it('maps Selenium SendKeys signatures to a blocking keystroke floor', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(
+      service.build([
+        event('keystroke_anomaly_observed', 100, {
+          reason: 'selenium_sendkeys_signature',
+        }),
+      ]).map((factor) => [factor.kind, factor.contribution, factor.reasonCodes?.[0]]),
+    ).toEqual([
+      ['keystroke_dynamics', 30, 'selenium_sendkeys_signature'],
+      ['composite_risk_boost', 55, 'keystroke_block_floor'],
+    ]);
+  });
+
+  it('uses ONNX confidence metadata when mapping not-user verdicts', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(
+      service.build([
+        event('keystroke_anomaly_observed', 100, {
+          confidence: 0.91,
+          reason: 'onnx_not_user_high_confidence',
+          verdict: 'not_user',
+        }),
+      ]).map((factor) => [factor.kind, factor.contribution, factor.reasonCodes?.[0]]),
+    ).toEqual([
+      ['keystroke_dynamics', 30, 'onnx_not_user_high_confidence'],
+      ['composite_risk_boost', 30, 'keystroke_step_up_floor'],
+    ]);
+  });
+
+  it.each([
+    { confidence: 0.86, reason: 'onnx_user_match_high_confidence', verdict: 'match' },
+    { reason: 'local_baseline_scaled_manhattan_match', scaledManhattanDistance: 0.12, threshold: 0.75 },
+  ])('does not emit risk factors for allow keystroke verdicts', (metadata) => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(service.build([event('keystroke_anomaly_observed', 100, metadata)])).toEqual([]);
+  });
+
   it('maps missing typing corrections to monitor-strength keystroke dynamics', () => {
     const service = new LiveInteractionRiskFactorBuildingService();
 

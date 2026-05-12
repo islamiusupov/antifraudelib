@@ -211,6 +211,57 @@ describe('DBankLiveFactorExtractingService', () => {
     ]);
   });
 
+  it('extracts a blocking keystroke boost for Selenium SendKeys signatures', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('keystroke_anomaly_observed', 100, {
+          reason: 'selenium_sendkeys_signature',
+        }),
+      ]).map((signal) => [signal.kind, signal.contribution, signal.reasonCodes?.[0]]),
+    ).toEqual([
+      ['keystroke_dynamics', undefined, 'selenium_sendkeys_signature'],
+      ['composite_risk_boost', 55, 'keystroke_block_floor'],
+    ]);
+  });
+
+  it('extracts ONNX not-user keystroke verdicts only with high confidence metadata', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('keystroke_anomaly_observed', 100, {
+          confidence: 0.91,
+          reason: 'onnx_not_user_high_confidence',
+          verdict: 'not_user',
+        }),
+      ]).map((signal) => [signal.kind, signal.contribution, signal.reasonCodes?.[0]]),
+    ).toEqual([
+      ['keystroke_dynamics', undefined, 'onnx_not_user_high_confidence'],
+      ['composite_risk_boost', 30, 'keystroke_step_up_floor'],
+    ]);
+  });
+
+  it('does not extract risk for allow keystroke verdicts from D-bank callbacks', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('keystroke_anomaly_observed', 100, {
+          reason: 'local_baseline_scaled_manhattan_match',
+          scaledManhattanDistance: 0.12,
+          threshold: 0.75,
+        }),
+        event('keystroke_anomaly_observed', 200, {
+          confidence: 0.86,
+          reason: 'onnx_user_match_high_confidence',
+          verdict: 'match',
+        }),
+      ]),
+    ).toEqual([]);
+  });
+
   it('extracts missing typing corrections as monitor-strength keystroke dynamics', () => {
     const service = new DBankLiveFactorExtractingService();
 

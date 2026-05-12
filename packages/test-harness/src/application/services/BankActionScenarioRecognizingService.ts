@@ -346,7 +346,7 @@ export class BankActionScenarioRecognizingService {
     return this.keystrokeDynamicsSignalBuildingService
       .build(
         this.eventReasonCodes(actions, 'keystroke_anomaly_observed', 'keystroke_dynamics_anomaly'),
-        { eventCount: this.countActions(actions, 'keystroke_anomaly_observed') },
+        this.actionMetadata(actions, 'keystroke_anomaly_observed'),
       )
       .map((signal) => this.createRecognition(
         signal.kind,
@@ -386,6 +386,18 @@ export class BankActionScenarioRecognizingService {
       ], []);
   }
 
+  private actionMetadata(actions: BankActionEntity[], kind: BankActionEntity['kind']): Record<string, unknown> {
+    const observations = actions
+      .filter((action) => action.kind === kind && this.isMetadataRecord(action.metadata))
+      .map((action) => action.metadata as Record<string, unknown>);
+    const latestMetadata = observations.length > 0 ? observations[observations.length - 1] : {};
+    return {
+      ...latestMetadata,
+      eventCount: this.countActions(actions, kind),
+      observations,
+    };
+  }
+
   private metadataReasonCodes(metadata: BankActionEntity['metadata'], fallback: string): string[] {
     const reason = metadata?.reason;
     if (typeof reason === 'string' && reason.trim() !== '') return [reason];
@@ -397,5 +409,9 @@ export class BankActionScenarioRecognizingService {
       if (validReasonCodes.length > 0) return validReasonCodes;
     }
     return [fallback];
+  }
+
+  private isMetadataRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 }

@@ -43,7 +43,7 @@ export class LiveInteractionRiskFactorBuildingService {
     }
     signals.push(...this.keystrokeDynamicsSignalBuildingService.build(
       this.keystrokeReasonCodes(events),
-      { eventCount: this.count(events, 'keystroke_anomaly_observed') },
+      this.keystrokeMetadata(events),
     ));
     this.pushIfPresent(signals, events, 'phishing_text_observed', 'phishing_text_dom', ['phishing_text_dom']);
     this.pushIfPresent(signals, events, 'native_tampering_observed', 'native_tampering', ['native_tampering']);
@@ -101,6 +101,18 @@ export class LiveInteractionRiskFactorBuildingService {
       ], []);
   }
 
+  private keystrokeMetadata(events: LiveInteractionEventEntity[]): Record<string, unknown> {
+    const observations = events
+      .filter((event) => event.kind === 'keystroke_anomaly_observed' && this.isMetadataRecord(event.metadata))
+      .map((event) => event.metadata as Record<string, unknown>);
+    const latestMetadata = observations.length > 0 ? observations[observations.length - 1] : {};
+    return {
+      ...latestMetadata,
+      eventCount: this.count(events, 'keystroke_anomaly_observed'),
+      observations,
+    };
+  }
+
   private eventReasonCodes(metadata: Record<string, unknown> | undefined, fallback: string): string[] {
     const reason = metadata?.reason;
     if (typeof reason === 'string' && reason.trim() !== '') return [reason];
@@ -112,6 +124,10 @@ export class LiveInteractionRiskFactorBuildingService {
       if (validReasonCodes.length > 0) return validReasonCodes;
     }
     return [fallback];
+  }
+
+  private isMetadataRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 
   private has(events: LiveInteractionEventEntity[], kind: LiveInteractionEventEntity['kind']): boolean {

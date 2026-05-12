@@ -4,8 +4,10 @@ import { KeystrokeDynamicsSignalBuildingService } from '../../../src/application
 describe('KeystrokeDynamicsSignalBuildingService', () => {
   it.each([
     'long_keystroke_pause_instruction_pattern',
+    'ngram_profile_mismatch',
     'uniform_keystroke_interval_automation',
     'short_key_hold_time_automation',
+    'bimodal_inter_key_timing',
   ])('adds a step-up boost for %s', (reasonCode) => {
     const service = new KeystrokeDynamicsSignalBuildingService();
 
@@ -27,6 +29,69 @@ describe('KeystrokeDynamicsSignalBuildingService', () => {
         },
       }),
     ]);
+  });
+
+  it('adds a step-up boost for high-confidence ONNX not-user verdicts', () => {
+    const service = new KeystrokeDynamicsSignalBuildingService();
+
+    expect(service.build(['onnx_not_user_high_confidence'], { confidence: 0.91, verdict: 'not_user' }))
+      .toEqual([
+        expect.objectContaining({
+          kind: 'keystroke_dynamics',
+          confidence: 1,
+          reasonCodes: ['onnx_not_user_high_confidence'],
+        }),
+        expect.objectContaining({
+          kind: 'composite_risk_boost',
+          contribution: 30,
+          reasonCodes: ['keystroke_step_up_floor'],
+        }),
+      ]);
+  });
+
+  it('ignores ONNX not-user verdicts below the strict confidence threshold', () => {
+    const service = new KeystrokeDynamicsSignalBuildingService();
+
+    expect(service.build(['onnx_not_user_high_confidence'], { confidence: 0.9, verdict: 'not_user' }))
+      .toEqual([]);
+  });
+
+  it('matches ONNX confidence to the same observation reason code', () => {
+    const service = new KeystrokeDynamicsSignalBuildingService();
+
+    expect(service.build(['onnx_not_user_high_confidence', 'onnx_user_match_high_confidence'], {
+      observations: [
+        { confidence: 0.89, reason: 'onnx_not_user_high_confidence' },
+        { confidence: 0.99, reason: 'onnx_user_match_high_confidence' },
+      ],
+    })).toEqual([]);
+  });
+
+  it('adds a blocking boost for Selenium SendKeys signatures', () => {
+    const service = new KeystrokeDynamicsSignalBuildingService();
+
+    expect(service.build(['selenium_sendkeys_signature'])).toEqual([
+      expect.objectContaining({
+        kind: 'keystroke_dynamics',
+        confidence: 1,
+        reasonCodes: ['selenium_sendkeys_signature'],
+      }),
+      expect.objectContaining({
+        kind: 'composite_risk_boost',
+        contribution: 55,
+        maxContribution: 55,
+        reasonCodes: ['keystroke_block_floor'],
+      }),
+    ]);
+  });
+
+  it.each([
+    ['local_baseline_scaled_manhattan_match', { scaledManhattanDistance: 0.12, threshold: 0.75 }],
+    ['onnx_user_match_high_confidence', { confidence: 0.86, verdict: 'match' }],
+  ])('keeps allow reason %s out of risk signals', (reasonCode, metadata) => {
+    const service = new KeystrokeDynamicsSignalBuildingService();
+
+    expect(service.build([reasonCode], metadata)).toEqual([]);
   });
 
   it('keeps missing typing corrections at monitor strength without a step-up boost', () => {

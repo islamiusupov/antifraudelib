@@ -69,6 +69,63 @@ describe('KeystrokeInteractionCollectingService', () => {
     ]);
   });
 
+  it('captures ngram mismatches against the user typing profile', () => {
+    const context = createContext({
+      expectedNgrams: ['se', 'ec', 'cu', 'ur'],
+    });
+
+    'money'.split('').forEach((key, index) => {
+      context.now = index * 90;
+      context.keyDown({ key, isTrusted: true });
+    });
+
+    expect(context.events).toEqual([
+      expect.objectContaining({
+        atMs: 360,
+        kind: 'keystroke_anomaly_observed',
+        metadata: expect.objectContaining({
+          reason: 'ngram_profile_mismatch',
+          sampleCount: 4,
+        }),
+      }),
+    ]);
+  });
+
+  it('captures Selenium SendKeys-style untrusted key events as a blocking signature', () => {
+    const context = createContext();
+
+    context.keyDown({ key: '1', isTrusted: false });
+
+    expect(context.events).toEqual([
+      {
+        atMs: 0,
+        kind: 'keystroke_anomaly_observed',
+        metadata: {
+          reason: 'selenium_sendkeys_signature',
+        },
+      },
+    ]);
+  });
+
+  it('captures bimodal inter-key timing when two operators alternate typing cadence', () => {
+    const context = createContext();
+
+    [0, 90, 990, 1085, 2005, 2105, 3015].forEach((time) => {
+      context.now = time;
+      context.keyDown({ key: '1', isTrusted: true });
+    });
+
+    expect(context.events).toEqual([
+      expect.objectContaining({
+        atMs: 3015,
+        kind: 'keystroke_anomaly_observed',
+        metadata: expect.objectContaining({
+          reason: 'bimodal_inter_key_timing',
+        }),
+      }),
+    ]);
+  });
+
   it('monitors long recipient typing without corrections only for correction-expected targets', () => {
     const context = createContext();
     const recipientTarget = { name: 'recipientName', value: '' };
@@ -105,7 +162,7 @@ describe('KeystrokeInteractionCollectingService', () => {
   });
 });
 
-function createContext(options: { correctionExpected?: boolean } = {}) {
+function createContext(options: { correctionExpected?: boolean; expectedNgrams?: string[] } = {}) {
   const service = new KeystrokeInteractionCollectingService();
   const state = service.createState();
   const events: LiveInteractionEventEntity[] = [];
@@ -115,6 +172,7 @@ function createContext(options: { correctionExpected?: boolean } = {}) {
     keyDown(event: LiveInteractionDomEventEntity) {
       service.recordKeyDown({
         isCorrectionExpectedTarget: () => options.correctionExpected ?? true,
+        keystrokeExpectedNgrams: options.expectedNgrams,
         now: () => context.now,
         onEvent: (nextEvent) => events.push(nextEvent),
       }, state, event);
@@ -122,6 +180,7 @@ function createContext(options: { correctionExpected?: boolean } = {}) {
     keyUp(event: LiveInteractionDomEventEntity) {
       service.recordKeyUp({
         isCorrectionExpectedTarget: () => options.correctionExpected ?? true,
+        keystrokeExpectedNgrams: options.expectedNgrams,
         now: () => context.now,
         onEvent: (nextEvent) => events.push(nextEvent),
       }, state, event);

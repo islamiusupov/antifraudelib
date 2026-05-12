@@ -10,12 +10,41 @@ describe('KeystrokeDynamicsClassifyingService', () => {
         intervalsMs: [120, 130, 125, 135],
         baselineMedianMs: 125,
       }),
-    ).toEqual({
+    ).toMatchObject({
       kind: 'keystroke_dynamics',
       detected: false,
       confidence: 0,
-      reasonCodes: [],
+      reasonCodes: ['local_baseline_scaled_manhattan_match', 'onnx_user_match_high_confidence'],
       source: 'live',
+      metadata: {
+        classifier: 'keystroke-dynamics-timing-v0',
+        scaledManhattanDistance: 0.04,
+        threshold: 0.75,
+        verdict: 'match',
+      },
+    });
+  });
+
+  it('returns local baseline allow when scaled Manhattan distance stays below threshold', () => {
+    const service = new KeystrokeDynamicsClassifyingService();
+
+    expect(
+      service.classify({
+        intervalsMs: [200, 210, 190, 220],
+        baselineMedianMs: 125,
+      }),
+    ).toMatchObject({
+      kind: 'keystroke_dynamics',
+      detected: false,
+      confidence: 0,
+      reasonCodes: ['local_baseline_scaled_manhattan_match'],
+      source: 'live',
+      metadata: {
+        classifier: 'keystroke-dynamics-timing-v0',
+        scaledManhattanDistance: 0.64,
+        threshold: 0.75,
+        verdict: 'baseline_match',
+      },
     });
   });
 
@@ -30,11 +59,13 @@ describe('KeystrokeDynamicsClassifyingService', () => {
     ).toEqual({
       kind: 'keystroke_dynamics',
       detected: true,
-      confidence: 0.8,
-      reasonCodes: ['keystroke_dynamics_anomaly'],
+      confidence: 1,
+      reasonCodes: ['onnx_not_user_high_confidence'],
       source: 'live',
       metadata: {
         classifier: 'keystroke-dynamics-timing-v0',
+        confidence: 1,
+        verdict: 'not_user',
         modelScore: 1,
         features: {
           meanRelativeDeviation: 4.14,

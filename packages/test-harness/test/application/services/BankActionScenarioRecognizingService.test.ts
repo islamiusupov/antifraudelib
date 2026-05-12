@@ -240,6 +240,65 @@ describe('BankActionScenarioRecognizingService', () => {
       ]);
   });
 
+  it('recognizes Selenium SendKeys signatures as blocking keystroke traces', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('keystroke_anomaly_observed', 100, {
+          reason: 'selenium_sendkeys_signature',
+        }),
+      ],
+      catalog(),
+    );
+
+    expect(result.riskSignals.map((signal) => [signal.kind, signal.contribution, signal.reasonCodes?.[0]]))
+      .toEqual([
+        ['keystroke_dynamics', undefined, 'selenium_sendkeys_signature'],
+        ['composite_risk_boost', 55, 'keystroke_block_floor'],
+      ]);
+  });
+
+  it('recognizes high-confidence ONNX not-user verdicts from bank action metadata', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('keystroke_anomaly_observed', 100, {
+          confidence: 0.91,
+          reason: 'onnx_not_user_high_confidence',
+          verdict: 'not_user',
+        }),
+      ],
+      catalog(),
+    );
+
+    expect(result.riskSignals.map((signal) => [signal.kind, signal.contribution, signal.reasonCodes?.[0]]))
+      .toEqual([
+        ['keystroke_dynamics', undefined, 'onnx_not_user_high_confidence'],
+        ['composite_risk_boost', 30, 'keystroke_step_up_floor'],
+      ]);
+  });
+
+  it('does not recognize allow keystroke verdicts as risk traces', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('keystroke_anomaly_observed', 100, {
+          reason: 'local_baseline_scaled_manhattan_match',
+          scaledManhattanDistance: 0.12,
+          threshold: 0.75,
+        }),
+      ],
+      catalog(),
+    );
+
+    expect(result.status).toBe('no_match');
+    expect(result.recognitions).toEqual([]);
+    expect(result.riskSignals).toEqual([]);
+  });
+
   it('recognizes missing typing corrections as monitor-strength keystroke dynamics', () => {
     const service = new BankActionScenarioRecognizingService();
 

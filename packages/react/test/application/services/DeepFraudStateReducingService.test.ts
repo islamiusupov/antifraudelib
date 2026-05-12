@@ -464,7 +464,7 @@ describe('DeepFraudStateReducingService', () => {
     expect(state.assessment.decision.level).toBe('block');
   });
 
-  it('steps up KST-01 through KST-03 when keystroke dynamics include a step-up floor boost', () => {
+  it('steps up KST-01 through KST-03 and KST-05/KST-07/KST-08 with a keystroke floor boost', () => {
     const service = new DeepFraudStateReducingService();
 
     const state = service.createInitialState({
@@ -478,6 +478,22 @@ describe('DeepFraudStateReducingService', () => {
 
     expect(state.assessment.score).toBe(60);
     expect(state.assessment.decision.level).toBe('step_up');
+  });
+
+  it('blocks KST-06 Selenium SendKeys signatures with a keystroke block floor', () => {
+    const service = new DeepFraudStateReducingService();
+
+    const state = service.createInitialState({
+      userId: 'user-1',
+      consent: 'behavioral',
+      factors: [
+        factor('keystroke_dynamics', 30, 30, ['selenium_sendkeys_signature']),
+        factor('composite_risk_boost', 55, 55, ['keystroke_block_floor']),
+      ],
+    });
+
+    expect(state.assessment.score).toBe(85);
+    expect(state.assessment.decision.level).toBe('block');
   });
 
   it('monitors KST-04 missing typing corrections without a boost', () => {
