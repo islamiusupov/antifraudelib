@@ -19,6 +19,7 @@ const DBANK_OBSERVED_EVENT_KINDS: DBankObservedEventKind[] = [
   'keystroke_anomaly_observed',
   'pointer_anomaly_observed',
   'rapid_scroll_observed',
+  'click_burst_observed',
   'native_tampering_observed',
   'dev_environment_observed',
   'bot_detected',

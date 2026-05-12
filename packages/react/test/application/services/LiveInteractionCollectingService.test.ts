@@ -413,6 +413,36 @@ describe('LiveInteractionCollectingService', () => {
     ]);
   });
 
+  it('captures click bursts across the site', () => {
+    const documentTarget = new FakeDocumentTarget();
+    const events: LiveInteractionEventEntity[] = [];
+    let now = 100;
+
+    new LiveInteractionCollectingService().install({
+      target: { document: documentTarget },
+      clickBurstMinimumEvents: 4,
+      clickBurstWindowMs: 1000,
+      now: () => now,
+      onEvent: (event) => events.push(event),
+    });
+
+    [100, 250, 400, 550].forEach((time) => {
+      now = time;
+      documentTarget.dispatch('click', { target: { textContent: 'Menu' } });
+    });
+
+    expect(events).toEqual([
+      {
+        kind: 'click_burst_observed',
+        atMs: 550,
+        metadata: {
+          eventCount: 4,
+          windowMs: 1000,
+        },
+      },
+    ]);
+  });
+
   it('captures scroll events while warning text is visible', () => {
     const documentTarget = new FakeDocumentTarget();
     const events: LiveInteractionEventEntity[] = [];

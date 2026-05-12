@@ -10,6 +10,8 @@ export type LiveInteractionCollectingConfigEntity = {
   rapidScrollWindowMs?: number;
   rapidScrollMinimumEvents?: number;
   rapidScrollDeltaThreshold?: number;
+  clickBurstWindowMs?: number;
+  clickBurstMinimumEvents?: number;
   collectSpeechTranscripts?: boolean;
   speechLanguage?: string;
 };

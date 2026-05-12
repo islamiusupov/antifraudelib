@@ -26,6 +26,8 @@ const DEFAULT_FAST_KEY_INTERVAL_MS = 60;
 const DEFAULT_RAPID_SCROLL_WINDOW_MS = 700;
 const DEFAULT_RAPID_SCROLL_MINIMUM_EVENTS = 4;
 const DEFAULT_RAPID_SCROLL_DELTA_THRESHOLD = 80;
+const DEFAULT_CLICK_BURST_WINDOW_MS = 2000;
+const DEFAULT_CLICK_BURST_MINIMUM_EVENTS = 8;
 const RECIPIENT_BULK_FILL_WINDOW_MS = 5000;
 const RECIPIENT_BULK_FILL_MINIMUM_FIELDS = 3;
 
@@ -44,6 +46,7 @@ export class LiveInteractionCollectingService {
     let previousKeyAtMs: number | undefined;
     let fastKeyCount = 0;
     let rapidScrollTimes: number[] = [];
+    let clickTimes: number[] = [];
     const inputStates = new WeakMap<object, FieldInputTrackingState>();
     const recipientBulkFillTrackingState: RecipientBulkFillTrackingState = { records: [] };
 
@@ -122,6 +125,16 @@ export class LiveInteractionCollectingService {
         }
       };
       const handleClick = (event: LiveInteractionDomEventEntity) => {
+        const atMs = this.now(config);
+        const windowMs = config.clickBurstWindowMs ?? DEFAULT_CLICK_BURST_WINDOW_MS;
+        clickTimes = [...clickTimes.filter((clickAtMs) => atMs - clickAtMs <= windowMs), atMs];
+        if (clickTimes.length >= (config.clickBurstMinimumEvents ?? DEFAULT_CLICK_BURST_MINIMUM_EVENTS)) {
+          this.emit(config, 'click_burst_observed', {
+            eventCount: clickTimes.length,
+            windowMs,
+          });
+          clickTimes = [];
+        }
         if (CONFIRM_TEXT_PATTERN.test(this.targetText(event.target))) {
           this.emit(config, 'warning_confirmed');
         }

@@ -78,6 +78,19 @@ describe('LiveInteractionRiskFactorBuildingService', () => {
       ['rapid_scroll_pattern'],
     ]);
   });
+
+  it('maps click bursts to pointer pattern risk', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(service.build([event('click_burst_observed', 100)]))
+      .toEqual([
+        expect.objectContaining({
+          kind: 'pointer_pattern',
+          contribution: 20,
+          reasonCodes: ['click_burst_pattern'],
+        }),
+      ]);
+  });
 });
 
 function event(kind: LiveInteractionEventEntity['kind'], atMs: number): LiveInteractionEventEntity {

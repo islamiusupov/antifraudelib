@@ -30,9 +30,14 @@ export class LiveInteractionRiskFactorBuildingService {
     const pointerPatternReasonCodes = [
       ...(this.has(events, 'pointer_anomaly_observed') ? ['pointer_pattern_anomaly'] : []),
       ...(this.has(events, 'rapid_scroll_observed') ? ['rapid_scroll_pattern'] : []),
+      ...(this.has(events, 'click_burst_observed') ? ['click_burst_pattern'] : []),
     ];
     if (pointerPatternReasonCodes.length > 0) {
-      signals.push(this.signal('pointer_pattern', pointerPatternReasonCodes, 0.8));
+      signals.push(this.signal(
+        'pointer_pattern',
+        pointerPatternReasonCodes,
+        this.has(events, 'click_burst_observed') ? 1 : 0.8,
+      ));
     }
     this.pushIfPresent(signals, events, 'keystroke_anomaly_observed', 'keystroke_dynamics', ['keystroke_dynamics_anomaly'], 0.8);
     this.pushIfPresent(signals, events, 'phishing_text_observed', 'phishing_text_dom', ['phishing_text_dom']);

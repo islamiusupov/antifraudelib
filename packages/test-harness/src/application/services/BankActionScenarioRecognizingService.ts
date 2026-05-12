@@ -113,6 +113,9 @@ export class BankActionScenarioRecognizingService {
     if (this.hasAction(actions, 'rapid_scroll_observed')) {
       recognitions.push(this.createRecognition('pointer_pattern', 0.8, ['rapid_scroll_pattern'], catalog));
     }
+    if (this.hasAction(actions, 'click_burst_observed')) {
+      recognitions.push(this.createRecognition('pointer_pattern', 1, ['click_burst_pattern'], catalog));
+    }
     if (this.hasAction(actions, 'native_tampering_observed')) {
       recognitions.push(this.createRecognition('native_tampering', 1, ['native_tampering'], catalog));
     }

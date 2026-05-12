@@ -10,6 +10,7 @@ export type LiveInteractionEventEntity = {
     | 'page_visible'
     | 'pointer_anomaly_observed'
     | 'rapid_scroll_observed'
+    | 'click_burst_observed'
     | 'keystroke_anomaly_observed'
     | 'phishing_text_observed'
     | 'native_tampering_observed'

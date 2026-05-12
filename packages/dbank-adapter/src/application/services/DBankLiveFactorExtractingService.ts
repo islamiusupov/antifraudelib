@@ -131,6 +131,15 @@ export class DBankLiveFactorExtractingService {
         source: 'paper',
       });
     }
+    if (this.hasEvent(events, 'click_burst_observed')) {
+      signals.push({
+        kind: 'pointer_pattern',
+        detected: true,
+        confidence: 1,
+        reasonCodes: ['click_burst_pattern'],
+        source: 'live',
+      });
+    }
     if (this.hasEvent(events, 'native_tampering_observed')) {
       signals.push({
         kind: 'native_tampering',
