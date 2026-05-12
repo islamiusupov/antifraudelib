@@ -139,7 +139,15 @@ export class BankActionScenarioRecognizingService {
     serverFactorActions.forEach((action) => {
       const factor = action.metadata?.factor;
       if (typeof factor !== 'string') return;
-      recognitions.push(this.createRecognition(factor, 1, [`${factor}_server_helper`], catalog));
+      recognitions.push(
+        this.createRecognition(
+          factor,
+          1,
+          this.serverFactorReasonCodes(factor, action.metadata),
+          catalog,
+          { metadata: action.metadata },
+        ),
+      );
     });
 
     return recognitions;
@@ -232,6 +240,17 @@ export class BankActionScenarioRecognizingService {
     if (metadata?.testPaymentPattern === true || metadata?.isTestPayment === true) return true;
     return this.extractTextMetadata(metadata, ['paymentPattern', 'comment', 'purpose', 'description', 'message', 'remittanceInfo'])
       .some((value) => TEST_PAYMENT_TEXT_PATTERN.test(value));
+  }
+
+  private serverFactorReasonCodes(factor: string, metadata: BankActionEntity['metadata']): string[] {
+    const reason = metadata?.reason;
+    if (typeof reason === 'string' && reason.trim() !== '') return [reason];
+    const reasonCodes = metadata?.reasonCodes;
+    if (Array.isArray(reasonCodes)) {
+      const validReasonCodes = reasonCodes.filter((value): value is string => typeof value === 'string' && value.trim() !== '');
+      if (validReasonCodes.length > 0) return validReasonCodes;
+    }
+    return [`${factor}_server_helper`];
   }
 
   private hasNewRecipientLayeringPattern(actions: BankActionEntity[]): boolean {

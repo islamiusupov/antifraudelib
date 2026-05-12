@@ -223,8 +223,9 @@ export class DBankLiveFactorExtractingService {
           kind: factor,
           detected: true,
           confidence: 1,
-          reasonCodes: [`${factor}_server_helper`],
+          reasonCodes: this.serverFactorReasonCodes(factor, event.metadata),
           source: 'server',
+          metadata: event.metadata,
         });
       });
 
@@ -350,6 +351,17 @@ export class DBankLiveFactorExtractingService {
     if (metadata?.testPaymentPattern === true || metadata?.isTestPayment === true) return true;
     return this.extractTextMetadata(metadata, ['paymentPattern', 'comment', 'purpose', 'description', 'message', 'remittanceInfo'])
       .some((value) => TEST_PAYMENT_TEXT_PATTERN.test(value));
+  }
+
+  private serverFactorReasonCodes(factor: string, metadata: DBankObservedEventEntity['metadata']): string[] {
+    const reason = metadata?.reason;
+    if (typeof reason === 'string' && reason.trim() !== '') return [reason];
+    const reasonCodes = metadata?.reasonCodes;
+    if (Array.isArray(reasonCodes)) {
+      const validReasonCodes = reasonCodes.filter((value): value is string => typeof value === 'string' && value.trim() !== '');
+      if (validReasonCodes.length > 0) return validReasonCodes;
+    }
+    return [`${factor}_server_helper`];
   }
 
   private hasNewRecipientLayeringPattern(events: DBankObservedEventEntity[]): boolean {

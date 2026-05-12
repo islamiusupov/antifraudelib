@@ -347,6 +347,46 @@ describe('DBankLiveFactorExtractingService', () => {
     ).toEqual([]);
   });
 
+  it('uses reason codes emitted by D-bank server factor callbacks', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('server_factor_observed', 100, {
+          factor: 'amount_anomaly',
+          reason: 'amount_above_p95',
+        }),
+        event('server_factor_observed', 200, {
+          factor: 'recipient_velocity',
+          reasonCodes: ['new_recipient_layering_pattern'],
+        }),
+      ]),
+    ).toEqual([
+      {
+        kind: 'amount_anomaly',
+        detected: true,
+        confidence: 1,
+        reasonCodes: ['amount_above_p95'],
+        source: 'server',
+        metadata: {
+          factor: 'amount_anomaly',
+          reason: 'amount_above_p95',
+        },
+      },
+      {
+        kind: 'recipient_velocity',
+        detected: true,
+        confidence: 1,
+        reasonCodes: ['new_recipient_layering_pattern'],
+        source: 'server',
+        metadata: {
+          factor: 'recipient_velocity',
+          reasonCodes: ['new_recipient_layering_pattern'],
+        },
+      },
+    ]);
+  });
+
   it('does not flag warning dwell when confirmation takes at least one second', () => {
     const service = new DBankLiveFactorExtractingService();
 

@@ -132,6 +132,7 @@ describe('BankActionScenarioRecognizingService', () => {
     const result = service.recognize(
       [
         action('server_factor_observed', 100, { factor: 'tls_fingerprint' }),
+        action('server_factor_observed', 150, { factor: 'amount_anomaly', reason: 'amount_above_p95' }),
         action('server_factor_observed', 200, { factor: ['device_fingerprint'] }),
         action('server_factor_observed', 300),
       ],
@@ -145,11 +146,29 @@ describe('BankActionScenarioRecognizingService', () => {
         reasonCodes: ['tls_fingerprint_server_helper'],
         candidateScenarioIds: [],
       }),
+      expect.objectContaining({
+        factor: 'amount_anomaly',
+        confidence: 1,
+        reasonCodes: ['amount_above_p95'],
+        candidateScenarioIds: [],
+        metadata: {
+          factor: 'amount_anomaly',
+          reason: 'amount_above_p95',
+        },
+      }),
     ]);
     expect(result.riskSignals).toEqual([
       expect.objectContaining({
         kind: 'tls_fingerprint',
         source: 'live',
+      }),
+      expect.objectContaining({
+        kind: 'amount_anomaly',
+        reasonCodes: ['amount_above_p95'],
+        metadata: {
+          factor: 'amount_anomaly',
+          reason: 'amount_above_p95',
+        },
       }),
     ]);
   });

@@ -60,7 +60,9 @@ describe('DBankEventRiskFactorsBuildingService', () => {
         maxContribution: 30,
         reasonCodes: ['amount_anomaly_server_helper'],
         source: 'server',
-        metadata: undefined,
+        metadata: {
+          factor: 'amount_anomaly',
+        },
       },
     ]);
   });
@@ -80,6 +82,30 @@ describe('DBankEventRiskFactorsBuildingService', () => {
         event('server_factor_observed', 200, { factor: ['amount_anomaly'] }),
       ]),
     ).toEqual([]);
+  });
+
+  it('keeps D-bank server callback reason codes on scored factors', () => {
+    const service = new DBankEventRiskFactorsBuildingService();
+
+    expect(
+      service.build([
+        event('server_factor_observed', 100, {
+          factor: 'amount_anomaly',
+          reason: 'amount_above_p95',
+        }),
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        kind: 'amount_anomaly',
+        contribution: 30,
+        maxContribution: 30,
+        reasonCodes: ['amount_above_p95'],
+        metadata: {
+          factor: 'amount_anomaly',
+          reason: 'amount_above_p95',
+        },
+      }),
+    ]);
   });
 
   it('scores a current-session unused recipient as step-up ready factors', () => {
