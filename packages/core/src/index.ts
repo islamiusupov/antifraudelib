@@ -7,6 +7,7 @@ export type { RiskFactorEntity } from './domain/entities/RiskFactorEntity';
 export type { RiskReasonEntity } from './domain/entities/RiskReasonEntity';
 export type { RiskScoringRequestEntity } from './domain/entities/RiskScoringRequestEntity';
 export type { RiskSignalEntity } from './domain/entities/RiskSignalEntity';
+export type { ServerFactorEvaluationEntity } from './domain/entities/ServerFactorEvaluationEntity';
 export type { RiskDecisionLevel } from './domain/value-objects/RiskDecisionLevel';
 export type { RiskFactorKind, KnownRiskFactorKind } from './domain/value-objects/RiskFactorKind';
 export type { RiskFactorSource } from './domain/value-objects/RiskFactorSource';
@@ -19,3 +20,4 @@ export { RISK_FACTOR_DEFINITIONS } from './domain/constants/RiskFactorDefinition
 export { FactorContributionBuildingService } from './application/services/FactorContributionBuildingService';
 export { RiskScoringService } from './application/services/RiskScoringService';
 export { RiskThresholdResolvingService } from './application/services/RiskThresholdResolvingService';
+export { ServerFactorEvaluationAdaptingService } from './application/services/ServerFactorEvaluationAdaptingService';
