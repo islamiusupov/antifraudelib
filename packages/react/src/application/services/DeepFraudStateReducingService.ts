@@ -58,8 +58,19 @@ export class DeepFraudStateReducingService {
 
   private addCompositeFactors(factors: RiskFactorEntity[]): RiskFactorEntity[] {
     if (this.hasFactor(factors, 'composite_risk_boost')) return factors;
-    if (this.hasFactor(factors, 'copy_paste_recipient') && this.hasFactor(factors, 'concurrent_media')) {
-      return this.withCompositeBoost(factors, 'copy_paste_concurrent_media_composite');
+    if (
+      this.hasFactor(factors, 'new_recipient') &&
+      this.hasFactor(factors, 'copy_paste_recipient') &&
+      this.hasFactor(factors, 'concurrent_media')
+    ) {
+      return this.withCompositeBoost(factors, 'new_recipient_copy_paste_concurrent_media_composite');
+    }
+    if (
+      this.hasFactor(factors, 'new_recipient') &&
+      this.hasFactor(factors, 'phishing_text_dom') &&
+      this.hasFactor(factors, 'warning_dwell')
+    ) {
+      return this.withCompositeBoost(factors, 'new_recipient_phishing_warning_skip_composite');
     }
     if (
       this.hasFactor(factors, 'new_recipient') &&

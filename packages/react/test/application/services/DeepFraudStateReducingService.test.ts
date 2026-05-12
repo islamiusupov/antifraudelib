@@ -333,7 +333,33 @@ describe('DeepFraudStateReducingService', () => {
     expect(state.assessment.decision.level).toBe('block');
   });
 
-  it('blocks COMP-18 copy-paste with concurrent media using a composite boost', () => {
+  it('blocks COMP-18 new recipient with copy-paste and concurrent media using a composite boost', () => {
+    const service = new DeepFraudStateReducingService();
+
+    const state = service.createInitialState({
+      userId: 'user-1',
+      consent: 'behavioral',
+      factors: [
+        factor('new_recipient', 25, 25, ['new_recipient_in_flow']),
+        factor('copy_paste_recipient', 40, 40, ['copy_paste_recipient']),
+        factor('concurrent_media', 35, 35, ['concurrent_media_active']),
+      ],
+    });
+
+    expect(state.factors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'composite_risk_boost',
+          contribution: 10,
+          reasonCodes: ['new_recipient_copy_paste_concurrent_media_composite'],
+        }),
+      ]),
+    );
+    expect(state.assessment.score).toBe(100);
+    expect(state.assessment.decision.level).toBe('block');
+  });
+
+  it('keeps copy-paste with concurrent media below block when the recipient is not new', () => {
     const service = new DeepFraudStateReducingService();
 
     const state = service.createInitialState({
@@ -345,31 +371,37 @@ describe('DeepFraudStateReducingService', () => {
       ],
     });
 
-    expect(state.factors).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          kind: 'composite_risk_boost',
-          contribution: 10,
-          reasonCodes: ['copy_paste_concurrent_media_composite'],
-        }),
-      ]),
+    const hasCompositeBoost = state.factors.some(
+      (currentFactor) => currentFactor.kind === 'composite_risk_boost',
     );
-    expect(state.assessment.score).toBe(85);
-    expect(state.assessment.decision.level).toBe('block');
+
+    expect(hasCompositeBoost).toBe(false);
+    expect(state.assessment.score).toBe(75);
+    expect(state.assessment.decision.level).toBe('step_up');
   });
 
-  it('blocks COMP-19 copy-paste with phishing text for safe account wording', () => {
+  it('blocks COMP-19 new recipient with phishing text and skipped warning', () => {
     const service = new DeepFraudStateReducingService();
 
     const state = service.createInitialState({
       userId: 'user-1',
       consent: 'behavioral',
       factors: [
-        factor('copy_paste_recipient', 40, 40, ['copy_paste_recipient']),
+        factor('new_recipient', 25, 25, ['new_recipient_in_flow']),
         factor('phishing_text_dom', 60, 60, ['phishing_text_dom']),
+        factor('warning_dwell', 20, 20, ['warning_skipped']),
       ],
     });
 
+    expect(state.factors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'composite_risk_boost',
+          contribution: 10,
+          reasonCodes: ['new_recipient_phishing_warning_skip_composite'],
+        }),
+      ]),
+    );
     expect(state.assessment.score).toBe(100);
     expect(state.assessment.decision.level).toBe('block');
   });
