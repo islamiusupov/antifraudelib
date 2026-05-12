@@ -290,6 +290,14 @@ describe('BankActionScenarioRecognizingService', () => {
           scaledManhattanDistance: 0.12,
           threshold: 0.75,
         }),
+        action('keystroke_anomaly_observed', 200, {
+          cadenceRatio: 1.6,
+          reason: 'local_baseline_slow_cadence_match',
+        }),
+        action('keystroke_anomaly_observed', 300, {
+          cadenceRatio: 0.6,
+          reason: 'local_baseline_fast_cadence_match',
+        }),
       ],
       catalog(),
     );
@@ -297,6 +305,37 @@ describe('BankActionScenarioRecognizingService', () => {
     expect(result.status).toBe('no_match');
     expect(result.recognitions).toEqual([]);
     expect(result.riskSignals).toEqual([]);
+  });
+
+  it.each([
+    'baseline_insufficient_new_user',
+    'input_method_split_baseline',
+    'keyboard_layout_changed_ngram_set',
+  ])('recognizes %s as monitor-strength keystroke dynamics', (reason) => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('keystroke_anomaly_observed', 100, {
+          reason,
+        }),
+      ],
+      catalog(),
+    );
+
+    expect(result.recognitions).toEqual([
+      expect.objectContaining({
+        factor: 'keystroke_dynamics',
+        confidence: 1,
+        reasonCodes: [reason],
+      }),
+    ]);
+    expect(result.riskSignals).toEqual([
+      expect.objectContaining({
+        kind: 'keystroke_dynamics',
+        reasonCodes: [reason],
+      }),
+    ]);
   });
 
   it('recognizes missing typing corrections as monitor-strength keystroke dynamics', () => {

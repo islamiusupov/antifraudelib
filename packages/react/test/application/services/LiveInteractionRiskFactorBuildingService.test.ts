@@ -142,10 +142,34 @@ describe('LiveInteractionRiskFactorBuildingService', () => {
   it.each([
     { confidence: 0.86, reason: 'onnx_user_match_high_confidence', verdict: 'match' },
     { reason: 'local_baseline_scaled_manhattan_match', scaledManhattanDistance: 0.12, threshold: 0.75 },
+    { cadenceRatio: 1.6, reason: 'local_baseline_slow_cadence_match' },
+    { cadenceRatio: 0.6, reason: 'local_baseline_fast_cadence_match' },
   ])('does not emit risk factors for allow keystroke verdicts', (metadata) => {
     const service = new LiveInteractionRiskFactorBuildingService();
 
     expect(service.build([event('keystroke_anomaly_observed', 100, metadata)])).toEqual([]);
+  });
+
+  it.each([
+    'baseline_insufficient_new_user',
+    'input_method_split_baseline',
+    'keyboard_layout_changed_ngram_set',
+  ])('maps %s to monitor-strength keystroke dynamics', (reason) => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(
+      service.build([
+        event('keystroke_anomaly_observed', 100, {
+          reason,
+        }),
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        kind: 'keystroke_dynamics',
+        contribution: 30,
+        reasonCodes: [reason],
+      }),
+    ]);
   });
 
   it('maps missing typing corrections to monitor-strength keystroke dynamics', () => {

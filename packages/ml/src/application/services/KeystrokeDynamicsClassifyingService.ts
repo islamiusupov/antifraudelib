@@ -1,5 +1,7 @@
 import type { RiskSignalEntity } from '@deepcode/antifraud-core';
 import type { KeystrokeDynamicsInputEntity } from '../../domain/ml/entities/KeystrokeDynamicsInputEntity';
+import type { KeystrokeBaselineProfileMatchEntity } from '../../domain/ml/entities/KeystrokeBaselineProfileMatchEntity';
+import { KeystrokeBaselineProfileMatchingService } from './KeystrokeBaselineProfileMatchingService';
 import { KeystrokeDynamicsFeatureVectorBuildingService } from './KeystrokeDynamicsFeatureVectorBuildingService';
 import { KeystrokeDynamicsModelScoringService } from './KeystrokeDynamicsModelScoringService';
 
@@ -10,9 +12,18 @@ export class KeystrokeDynamicsClassifyingService {
   constructor(
     private readonly keystrokeDynamicsFeatureVectorBuildingService = new KeystrokeDynamicsFeatureVectorBuildingService(),
     private readonly keystrokeDynamicsModelScoringService = new KeystrokeDynamicsModelScoringService(),
+    private readonly keystrokeBaselineProfileMatchingService = new KeystrokeBaselineProfileMatchingService(),
   ) {}
 
   classify(input: KeystrokeDynamicsInputEntity): RiskSignalEntity {
+    const baselineProfileMatch = this.keystrokeBaselineProfileMatchingService.match(input);
+    if (baselineProfileMatch.verdict === 'monitor') {
+      return this.monitor(baselineProfileMatch);
+    }
+    if (baselineProfileMatch.verdict === 'allow') {
+      return this.inactiveFromBaselineProfile(baselineProfileMatch);
+    }
+
     const features = this.keystrokeDynamicsFeatureVectorBuildingService.build(input);
     const modelScore = this.keystrokeDynamicsModelScoringService.score(features);
     if (modelScore.score < modelScore.threshold) {
@@ -49,6 +60,28 @@ export class KeystrokeDynamicsClassifyingService {
         features: modelScore.features,
         verdict: 'not_user',
       },
+    };
+  }
+
+  private monitor(baselineProfileMatch: KeystrokeBaselineProfileMatchEntity): RiskSignalEntity {
+    return {
+      kind: 'keystroke_dynamics',
+      detected: true,
+      confidence: baselineProfileMatch.confidence,
+      reasonCodes: baselineProfileMatch.reasonCode === undefined ? [] : [baselineProfileMatch.reasonCode],
+      source: 'live',
+      metadata: baselineProfileMatch.metadata,
+    };
+  }
+
+  private inactiveFromBaselineProfile(baselineProfileMatch: KeystrokeBaselineProfileMatchEntity): RiskSignalEntity {
+    return {
+      kind: 'keystroke_dynamics',
+      detected: false,
+      confidence: 0,
+      reasonCodes: baselineProfileMatch.reasonCode === undefined ? [] : [baselineProfileMatch.reasonCode],
+      source: 'live',
+      metadata: baselineProfileMatch.metadata,
     };
   }
 

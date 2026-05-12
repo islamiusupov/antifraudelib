@@ -258,8 +258,38 @@ describe('DBankLiveFactorExtractingService', () => {
           reason: 'onnx_user_match_high_confidence',
           verdict: 'match',
         }),
+        event('keystroke_anomaly_observed', 300, {
+          cadenceRatio: 1.6,
+          reason: 'local_baseline_slow_cadence_match',
+        }),
+        event('keystroke_anomaly_observed', 400, {
+          cadenceRatio: 0.6,
+          reason: 'local_baseline_fast_cadence_match',
+        }),
       ]),
     ).toEqual([]);
+  });
+
+  it.each([
+    'baseline_insufficient_new_user',
+    'input_method_split_baseline',
+    'keyboard_layout_changed_ngram_set',
+  ])('extracts %s as monitor-strength keystroke dynamics', (reason) => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('keystroke_anomaly_observed', 100, {
+          reason,
+        }),
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        kind: 'keystroke_dynamics',
+        confidence: 1,
+        reasonCodes: [reason],
+      }),
+    ]);
   });
 
   it('extracts missing typing corrections as monitor-strength keystroke dynamics', () => {

@@ -1,4 +1,5 @@
 export type { KeystrokeDynamicsInputEntity } from './domain/ml/entities/KeystrokeDynamicsInputEntity';
+export type { KeystrokeBaselineProfileMatchEntity } from './domain/ml/entities/KeystrokeBaselineProfileMatchEntity';
 export type { KeystrokeDynamicsFeatureVectorEntity } from './domain/ml/entities/KeystrokeDynamicsFeatureVectorEntity';
 export type { MlModelScoreEntity } from './domain/ml/entities/MlModelScoreEntity';
 export type { OnnxModelDefinitionEntity } from './domain/ml/entities/OnnxModelDefinitionEntity';
@@ -6,6 +7,7 @@ export type { PhishingUrlFeatureVectorEntity } from './domain/ml/entities/Phishi
 export type { PhishingUrlInputEntity } from './domain/ml/entities/PhishingUrlInputEntity';
 export type { MlFallbackKind } from './domain/value-objects/MlFallbackKind';
 export type { MlRuntimeKind } from './domain/value-objects/MlRuntimeKind';
+export { KeystrokeBaselineProfileMatchingService } from './application/services/KeystrokeBaselineProfileMatchingService';
 export { KeystrokeDynamicsClassifyingService } from './application/services/KeystrokeDynamicsClassifyingService';
 export { KeystrokeDynamicsFeatureVectorBuildingService } from './application/services/KeystrokeDynamicsFeatureVectorBuildingService';
 export { KeystrokeDynamicsModelScoringService } from './application/services/KeystrokeDynamicsModelScoringService';

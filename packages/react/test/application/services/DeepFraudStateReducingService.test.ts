@@ -510,6 +510,25 @@ describe('DeepFraudStateReducingService', () => {
     expect(state.assessment.score).toBe(30);
     expect(state.assessment.decision.level).toBe('monitor');
   });
+
+  it.each([
+    'baseline_insufficient_new_user',
+    'input_method_split_baseline',
+    'keyboard_layout_changed_ngram_set',
+  ])('monitors KST-11/KST-14/KST-15 %s without a step-up boost', (reasonCode) => {
+    const service = new DeepFraudStateReducingService();
+
+    const state = service.createInitialState({
+      userId: 'user-1',
+      consent: 'behavioral',
+      factors: [
+        factor('keystroke_dynamics', 30, 30, [reasonCode]),
+      ],
+    });
+
+    expect(state.assessment.score).toBe(30);
+    expect(state.assessment.decision.level).toBe('monitor');
+  });
 });
 
 function factor(

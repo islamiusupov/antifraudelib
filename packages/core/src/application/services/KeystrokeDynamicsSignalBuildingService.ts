@@ -22,12 +22,21 @@ const BLOCK_REASON_CODES = new Set([
 
 const ALLOW_REASON_CODES = new Set([
   'local_baseline_scaled_manhattan_match',
+  'local_baseline_slow_cadence_match',
+  'local_baseline_fast_cadence_match',
   'onnx_user_match_high_confidence',
+]);
+
+const MONITOR_REASON_CODES = new Set([
+  'baseline_insufficient_new_user',
+  'input_method_split_baseline',
+  'keyboard_layout_changed_ngram_set',
 ]);
 
 const FULL_CONFIDENCE_REASON_CODES = new Set([
   ...STEP_UP_REASON_CODES,
   ...BLOCK_REASON_CODES,
+  ...MONITOR_REASON_CODES,
   'missing_typing_corrections',
 ]);
 

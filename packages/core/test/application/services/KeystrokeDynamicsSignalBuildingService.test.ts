@@ -87,11 +87,29 @@ describe('KeystrokeDynamicsSignalBuildingService', () => {
 
   it.each([
     ['local_baseline_scaled_manhattan_match', { scaledManhattanDistance: 0.12, threshold: 0.75 }],
+    ['local_baseline_slow_cadence_match', { cadenceRatio: 1.6, patternStayedLocal: true }],
+    ['local_baseline_fast_cadence_match', { cadenceRatio: 0.6, patternStayedLocal: true }],
     ['onnx_user_match_high_confidence', { confidence: 0.86, verdict: 'match' }],
   ])('keeps allow reason %s out of risk signals', (reasonCode, metadata) => {
     const service = new KeystrokeDynamicsSignalBuildingService();
 
     expect(service.build([reasonCode], metadata)).toEqual([]);
+  });
+
+  it.each([
+    'baseline_insufficient_new_user',
+    'input_method_split_baseline',
+    'keyboard_layout_changed_ngram_set',
+  ])('keeps %s at monitor strength without a boost', (reasonCode) => {
+    const service = new KeystrokeDynamicsSignalBuildingService();
+
+    expect(service.build([reasonCode])).toEqual([
+      expect.objectContaining({
+        kind: 'keystroke_dynamics',
+        confidence: 1,
+        reasonCodes: [reasonCode],
+      }),
+    ]);
   });
 
   it('keeps missing typing corrections at monitor strength without a step-up boost', () => {
