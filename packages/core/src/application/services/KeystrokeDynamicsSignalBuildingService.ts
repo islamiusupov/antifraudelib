@@ -14,6 +14,7 @@ const STEP_UP_REASON_CODES = new Set([
   'short_key_hold_time_automation',
   'bimodal_inter_key_timing',
   'onnx_not_user_high_confidence',
+  'one_hand_typing_pattern',
 ]);
 
 const BLOCK_REASON_CODES = new Set([
@@ -25,6 +26,7 @@ const ALLOW_REASON_CODES = new Set([
   'local_baseline_slow_cadence_match',
   'local_baseline_fast_cadence_match',
   'onnx_user_match_high_confidence',
+  'voice_to_text_no_keystroke_factor',
 ]);
 
 const MONITOR_REASON_CODES = new Set([
@@ -45,6 +47,7 @@ export class KeystrokeDynamicsSignalBuildingService {
     const normalizedReasonCodes = this.riskReasonCodes(this.uniqueNonEmpty(reasonCodes), metadata);
     if (normalizedReasonCodes.length === 0) return [];
 
+    const signalMetadata = this.signalMetadata(normalizedReasonCodes, metadata);
     const signals: RiskSignalEntity[] = [
       {
         kind: 'keystroke_dynamics',
@@ -52,7 +55,7 @@ export class KeystrokeDynamicsSignalBuildingService {
         confidence: this.confidence(normalizedReasonCodes),
         reasonCodes: normalizedReasonCodes,
         source: 'live',
-        metadata,
+        metadata: signalMetadata,
       },
     ];
 
@@ -65,7 +68,7 @@ export class KeystrokeDynamicsSignalBuildingService {
         reasonCodes: ['keystroke_block_floor'],
         source: 'live',
         metadata: {
-          ...metadata,
+          ...signalMetadata,
           matchedReasonCodes: normalizedReasonCodes.filter((reasonCode) => BLOCK_REASON_CODES.has(reasonCode)),
         },
       });
@@ -78,7 +81,7 @@ export class KeystrokeDynamicsSignalBuildingService {
         reasonCodes: ['keystroke_step_up_floor'],
         source: 'live',
         metadata: {
-          ...metadata,
+          ...signalMetadata,
           matchedReasonCodes: normalizedReasonCodes.filter((reasonCode) => STEP_UP_REASON_CODES.has(reasonCode)),
         },
       });
@@ -89,6 +92,14 @@ export class KeystrokeDynamicsSignalBuildingService {
 
   private riskReasonCodes(reasonCodes: string[], metadata: Record<string, unknown>): string[] {
     return reasonCodes.filter((reasonCode) => this.isRiskReasonCode(reasonCode, metadata));
+  }
+
+  private signalMetadata(reasonCodes: string[], metadata: Record<string, unknown>): Record<string, unknown> {
+    if (!reasonCodes.includes('one_hand_typing_pattern')) return metadata;
+    return {
+      ...metadata,
+      falsePositiveRisk: true,
+    };
   }
 
   private isRiskReasonCode(reasonCode: string, metadata: Record<string, unknown>): boolean {

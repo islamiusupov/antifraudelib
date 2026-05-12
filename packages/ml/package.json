@@ -1,6 +1,6 @@
 {
   "name": "@deepcode/antifraud-ml",
-  "version": "0.0.0",
+  "version": "0.0.4",
   "description": "Lazy-loaded ONNX inference adapters for DeepCode Antifraud.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -8,11 +8,13 @@
     "dist",
     "models"
   ],
+  "publishConfig": {
+    "registry": "http://antifraud.deep-code.ai/verdaccio/"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },
-  "private": true,
   "dependencies": {
-    "@deepcode/antifraud-core": "^0.0.0"
+    "@deepcode/antifraud-core": "0.0.4"
   }
 }

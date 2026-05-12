@@ -92,6 +92,37 @@ describe('LiveInteractionCollectingService', () => {
     expect(events).toEqual([]);
   });
 
+  it('captures exact button hits without hover exploration through pointer analysis', () => {
+    const documentTarget = new FakeDocumentTarget();
+    const events: LiveInteractionEventEntity[] = [];
+    const buttonTarget = {
+      textContent: 'Approve',
+      getBoundingClientRect: () => ({ left: 100, top: 100, width: 40, height: 20 }),
+    };
+
+    new LiveInteractionCollectingService().install({
+      target: { document: documentTarget },
+      now: () => 200,
+      onEvent: (event) => events.push(event),
+    });
+
+    documentTarget.dispatch('click', {
+      target: buttonTarget,
+      clientX: 120,
+      clientY: 110,
+      pointerType: 'mouse',
+    });
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        kind: 'pointer_anomaly_observed',
+        metadata: expect.objectContaining({
+          reason: 'pointer_exact_hit_no_hover_exploration',
+        }),
+      }),
+    ]);
+  });
+
   it('captures pasted transfer amounts in amount fields', () => {
     const documentTarget = new FakeDocumentTarget();
     const events: LiveInteractionEventEntity[] = [];
@@ -116,9 +147,45 @@ describe('LiveInteractionCollectingService', () => {
         metadata: {
           targetText: 'transferAmount number Amount',
           pastedLength: 5,
+          manualKeyCount: 0,
+          keyCount: 0,
         },
       },
     ]);
+  });
+
+  it('does not treat saved login credentials as transfer copy-paste risk', () => {
+    const documentTarget = new FakeDocumentTarget();
+    const events: LiveInteractionEventEntity[] = [];
+    const usernameTarget = {
+      name: 'account',
+      autocomplete: 'username',
+      value: '+79991234567',
+    };
+    const passwordTarget = {
+      name: 'password',
+      type: 'password',
+      autocomplete: 'current-password',
+      value: 'saved-secret',
+    };
+
+    new LiveInteractionCollectingService().install({
+      target: { document: documentTarget },
+      now: () => 251,
+      onEvent: (event) => events.push(event),
+    });
+
+    documentTarget.dispatch('input', { target: usernameTarget });
+    documentTarget.dispatch('input', { target: passwordTarget });
+    documentTarget.dispatch('paste', {
+      target: usernameTarget,
+      clipboardData: {
+        getData: () => '+79991234567',
+      },
+    });
+    documentTarget.dispatch('keydown', { target: passwordTarget, key: '1', isTrusted: true });
+
+    expect(events).toEqual([]);
   });
 
   it('captures amount fields filled without typing when paste events are missing', () => {
@@ -144,6 +211,8 @@ describe('LiveInteractionCollectingService', () => {
           targetText: 'transferAmount number',
           pastedLength: 5,
           reason: 'filled_without_typing',
+          manualKeyCount: 0,
+          keyCount: 0,
         },
       },
     ]);
@@ -199,6 +268,8 @@ describe('LiveInteractionCollectingService', () => {
           targetText: 'transferAmount number',
           pastedLength: 5,
           reason: 'bulk_input_jump',
+          manualKeyCount: 1,
+          keyCount: 1,
         },
       },
     ]);
@@ -227,6 +298,8 @@ describe('LiveInteractionCollectingService', () => {
           targetText: 'recipientAccount',
           pastedLength: 20,
           reason: 'filled_without_typing',
+          manualKeyCount: 0,
+          keyCount: 0,
         },
       },
     ]);
@@ -384,6 +457,85 @@ describe('LiveInteractionCollectingService', () => {
         source: 'input',
       },
     });
+  });
+
+  it('captures phishing URLs from DOM text and anchors', () => {
+    const documentTarget = new FakeDocumentTarget();
+    documentTarget.body.innerText = 'Open sberbank-online-secure.shop to confirm payment';
+    documentTarget.anchors = [
+      {
+        href: 'https://gosuslugi-confirm.com',
+        textContent: 'Confirm account',
+      },
+    ];
+    const mutationObservers: FakeMutationObserver[] = [];
+    const events: LiveInteractionEventEntity[] = [];
+
+    new LiveInteractionCollectingService().install({
+      target: {
+        document: documentTarget,
+        MutationObserver: class extends FakeMutationObserver {
+          constructor(callback: () => void) {
+            super(callback);
+            mutationObservers.push(this);
+          }
+        },
+      },
+      now: () => 350,
+      onEvent: (event) => events.push(event),
+    });
+
+    expect(events.filter((event) => event.kind === 'phishing_url_observed')).toEqual([
+      expect.objectContaining({
+        atMs: 350,
+        metadata: expect.objectContaining({
+          source: 'dom',
+          url: 'sberbank-online-secure.shop',
+          reason: 'phishing_url_typosquat_bank_brand',
+          reasonCodes: expect.arrayContaining(['phishing_url_typosquat_bank_brand']),
+        }),
+      }),
+      expect.objectContaining({
+        atMs: 350,
+        metadata: expect.objectContaining({
+          source: 'dom',
+          url: 'https://gosuslugi-confirm.com',
+          reason: 'phishing_url_clipboard_gosuslugi_typosquat',
+          reasonCodes: expect.arrayContaining(['phishing_url_clipboard_gosuslugi_typosquat']),
+        }),
+      }),
+    ]);
+    expect(mutationObservers).toHaveLength(1);
+  });
+
+  it('captures phishing URLs from clipboard paste metadata', () => {
+    const documentTarget = new FakeDocumentTarget();
+    const events: LiveInteractionEventEntity[] = [];
+
+    new LiveInteractionCollectingService().install({
+      target: { document: documentTarget },
+      now: () => 360,
+      onEvent: (event) => events.push(event),
+    });
+
+    documentTarget.dispatch('paste', {
+      target: { name: 'comment' },
+      clipboardData: {
+        getData: () => 'https://gosuslugi-confirm.com',
+      },
+    });
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        kind: 'phishing_url_observed',
+        atMs: 360,
+        metadata: expect.objectContaining({
+          source: 'clipboard',
+          url: 'https://gosuslugi-confirm.com',
+          reason: 'phishing_url_clipboard_gosuslugi_typosquat',
+        }),
+      }),
+    ]);
   });
 
   it('captures fast key bursts and rapid nervous scrolling', () => {
@@ -587,6 +739,7 @@ describe('LiveInteractionCollectingService', () => {
 
 class FakeDocumentTarget {
   body = { innerText: '' };
+  anchors: unknown[] = [];
   visibilityState = 'visible';
   private readonly listeners = new Map<string, Array<(event: LiveInteractionDomEventEntity) => void>>();
 
@@ -604,6 +757,10 @@ class FakeDocumentTarget {
 
   listenerCount(): number {
     return Array.from(this.listeners.values()).reduce((sum, listeners) => sum + listeners.length, 0);
+  }
+
+  querySelectorAll(selector: string): ArrayLike<unknown> {
+    return selector === 'a[href]' ? this.anchors : [];
   }
 }
 

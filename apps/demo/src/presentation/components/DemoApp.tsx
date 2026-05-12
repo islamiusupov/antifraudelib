@@ -3,7 +3,23 @@ import { DemoBrowserConfigBuildingService } from '../../application/services/Dem
 import { DBankWorkbench } from './DBankWorkbench';
 
 export function DemoApp() {
-  const config = useMemo(() => new DemoBrowserConfigBuildingService().build(), []);
+  const config = useMemo(
+    () =>
+      new DemoBrowserConfigBuildingService().build({
+        routePrefix: resolveDBankRoutePrefix(),
+      }),
+    [],
+  );
 
   return <DBankWorkbench config={config} />;
+}
+
+function resolveDBankRoutePrefix(): string {
+  if (typeof window === 'undefined') return '/d-bank';
+
+  const pathname = window.location.pathname;
+  const basePath = pathname.endsWith('/') ? pathname : pathname.replace(/\/[^/]*$/, '/');
+  const normalizedBasePath = `/${basePath.replace(/^\/+|\/+$/g, '')}`;
+
+  return normalizedBasePath === '/' ? '/d-bank' : `${normalizedBasePath}/d-bank`;
 }

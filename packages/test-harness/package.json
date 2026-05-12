@@ -1,16 +1,21 @@
 {
   "name": "@deepcode/antifraud-test-harness",
-  "version": "0.0.1",
+  "version": "0.0.4",
   "description": "Executable scenario harness for running PRD scenarios against D-bank.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "registry": "http://antifraud.deep-code.ai/verdaccio/"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@deepcode/antifraud-core": "^0.0.0",
-    "@deepcode/antifraud-dbank-adapter": "0.0.0",
-    "@deepcode/antifraud-scenario-catalog": "0.0.0"
-  },
-  "private": true
+    "@deepcode/antifraud-core": "0.0.4",
+    "@deepcode/antifraud-dbank-adapter": "0.0.4",
+    "@deepcode/antifraud-scenario-catalog": "0.0.4"
+  }
 }

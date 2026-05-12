@@ -135,15 +135,31 @@ describe('DBankLiveFactorExtractingService', () => {
     expect(
       service.extract([
         event('page_hidden', 100),
-        event('page_visible', 500),
+        event('page_visible', 500, {
+          reason: 'frequent_page_exits_during_payment_form',
+        }),
       ]),
     ).toEqual([
       {
         kind: 'page_visibility',
         detected: true,
-        confidence: 0.8,
-        reasonCodes: ['page_visibility_oscillation'],
+        confidence: 1,
+        reasonCodes: ['frequent_page_exits_during_payment_form'],
         source: 'live',
+        metadata: expect.objectContaining({
+          visibleCount: 1,
+        }),
+      },
+      {
+        kind: 'composite_risk_boost',
+        detected: true,
+        contribution: 35,
+        maxContribution: 35,
+        reasonCodes: ['frequent_page_exits_during_payment_form'],
+        source: 'live',
+        metadata: expect.objectContaining({
+          matchedReasonCodes: ['frequent_page_exits_during_payment_form'],
+        }),
       },
     ]);
   });
@@ -152,13 +168,13 @@ describe('DBankLiveFactorExtractingService', () => {
     const service = new DBankLiveFactorExtractingService();
 
     expect(service.extract([event('rapid_scroll_observed', 100)])).toEqual([
-      {
+      expect.objectContaining({
         kind: 'pointer_pattern',
         detected: true,
         confidence: 0.8,
         reasonCodes: ['rapid_scroll_pattern'],
         source: 'paper',
-      },
+      }),
     ]);
   });
 
@@ -166,13 +182,73 @@ describe('DBankLiveFactorExtractingService', () => {
     const service = new DBankLiveFactorExtractingService();
 
     expect(service.extract([event('click_burst_observed', 100)])).toEqual([
-      {
+      expect.objectContaining({
         kind: 'pointer_pattern',
         detected: true,
         confidence: 1,
         reasonCodes: ['click_burst_pattern'],
         source: 'live',
-      },
+      }),
+    ]);
+  });
+
+  it('extracts step-up pointer reason codes with a boost', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('pointer_anomaly_observed', 100, {
+          reason: 'pointer_linear_rat_autofill',
+          pathEfficiency: 1,
+        }),
+      ]).map((signal) => [signal.kind, signal.contribution, signal.reasonCodes?.[0]]),
+    ).toEqual([
+      ['pointer_pattern', undefined, 'pointer_linear_rat_autofill'],
+      ['composite_risk_boost', 40, 'pointer_step_up_floor'],
+    ]);
+  });
+
+  it('extracts monitor pointer reasons without a boost', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('pointer_anomaly_observed', 100, {
+          reason: 'pointer_idle_drift_missing',
+        }),
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        kind: 'pointer_pattern',
+        confidence: 1,
+        reasonCodes: ['pointer_idle_drift_missing'],
+      }),
+    ]);
+  });
+
+  it('does not extract risk for allow pointer reasons from D-bank callbacks', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('pointer_anomaly_observed', 100, {
+          reason: 'pointer_fitts_law_slowdown',
+        }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it('extracts screen sharing heuristic events', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(service.extract([event('screen_sharing_observed', 100)])).toEqual([
+      expect.objectContaining({
+        kind: 'screen_sharing',
+        detected: true,
+        confidence: 1,
+        reasonCodes: ['screen_sharing_heuristic'],
+        source: 'live',
+      }),
     ]);
   });
 
@@ -211,6 +287,48 @@ describe('DBankLiveFactorExtractingService', () => {
     ]);
   });
 
+  it('extracts DevTools JS paste as a step-up signal', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('dev_environment_observed', 100, {
+          reason: 'devtools_console_long_js_paste',
+        }),
+      ]).map((signal) => [signal.kind, signal.contribution, signal.reasonCodes?.[0]]),
+    ).toEqual([
+      ['dev_environment', undefined, 'devtools_console_long_js_paste'],
+      ['composite_risk_boost', 45, 'devtools_step_up_floor'],
+    ]);
+  });
+
+  it('extracts webdriver DevTools evidence as a blocking bot signal', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('dev_environment_observed', 100, {
+          reason: 'webdriver_enabled',
+        }),
+      ]).map((signal) => [signal.kind, signal.contribution, signal.reasonCodes?.[0]]),
+    ).toEqual([
+      ['bot_detection', undefined, 'webdriver_enabled'],
+      ['composite_risk_boost', 35, 'devtools_bot_block_floor'],
+    ]);
+  });
+
+  it('does not extract DevTools risk for allow work-account callbacks', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('dev_environment_observed', 100, {
+          reason: 'devtools_allowed_work_account',
+        }),
+      ]),
+    ).toEqual([]);
+  });
+
   it('extracts a blocking keystroke boost for Selenium SendKeys signatures', () => {
     const service = new DBankLiveFactorExtractingService();
 
@@ -243,6 +361,37 @@ describe('DBankLiveFactorExtractingService', () => {
     ]);
   });
 
+  it('extracts KST-16 one-hand typing as a false-positive-risk step-up signal', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('keystroke_anomaly_observed', 100, {
+          reason: 'one_hand_typing_pattern',
+          injuryReported: true,
+        }),
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        kind: 'keystroke_dynamics',
+        reasonCodes: ['one_hand_typing_pattern'],
+        metadata: expect.objectContaining({
+          injuryReported: true,
+          falsePositiveRisk: true,
+        }),
+      }),
+      expect.objectContaining({
+        kind: 'composite_risk_boost',
+        contribution: 30,
+        reasonCodes: ['keystroke_step_up_floor'],
+        metadata: expect.objectContaining({
+          falsePositiveRisk: true,
+          matchedReasonCodes: ['one_hand_typing_pattern'],
+        }),
+      }),
+    ]);
+  });
+
   it('does not extract risk for allow keystroke verdicts from D-bank callbacks', () => {
     const service = new DBankLiveFactorExtractingService();
 
@@ -265,6 +414,126 @@ describe('DBankLiveFactorExtractingService', () => {
         event('keystroke_anomaly_observed', 400, {
           cadenceRatio: 0.6,
           reason: 'local_baseline_fast_cadence_match',
+        }),
+        event('keystroke_anomaly_observed', 500, {
+          reason: 'voice_to_text_no_keystroke_factor',
+          inputMethod: 'voice_to_text',
+        }),
+        event('voice_to_text_no_keystroke_factor', 600, {
+          inputMethod: 'voice_to_text',
+        }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it('extracts KST-18 constituent signals from keystroke, media, and page-exit events', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('keystroke_anomaly_observed', 100),
+        event('media_active', 150),
+        event('page_hidden', 200),
+        event('page_visible', 300, {
+          reason: 'frequent_page_exits_during_payment_form',
+        }),
+      ]).map((signal) => [signal.kind, signal.reasonCodes?.[0]]),
+    ).toEqual([
+      ['concurrent_media', 'concurrent_media_active'],
+      ['page_visibility', 'frequent_page_exits_during_payment_form'],
+      ['composite_risk_boost', 'frequent_page_exits_during_payment_form'],
+      ['keystroke_dynamics', 'keystroke_dynamics_anomaly'],
+    ]);
+  });
+
+  it('keeps KST-19 copy-paste manual key metadata for composite scoring', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('amount_pasted', 100, {
+          manualKeyCount: 0,
+          keyCount: 0,
+        }),
+        event('keystroke_anomaly_observed', 200),
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        kind: 'copy_paste_amount',
+        metadata: {
+          manualKeyCount: 0,
+          keyCount: 0,
+          eventCount: 1,
+          observations: [
+            {
+              manualKeyCount: 0,
+              keyCount: 0,
+            },
+          ],
+        },
+      }),
+      expect.objectContaining({
+        kind: 'keystroke_dynamics',
+      }),
+    ]);
+  });
+
+  it('extracts KST-20 first-time device signals with reason metadata', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('keystroke_anomaly_observed', 100),
+        event('device_fingerprint_observed', 200, {
+          reason: 'first_time_device',
+          firstSeenDevice: true,
+        }),
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        kind: 'keystroke_dynamics',
+      }),
+      expect.objectContaining({
+        kind: 'device_fingerprint',
+        reasonCodes: ['first_time_device'],
+        metadata: {
+          reason: 'first_time_device',
+          firstSeenDevice: true,
+          eventCount: 1,
+          observations: [
+            {
+              reason: 'first_time_device',
+              firstSeenDevice: true,
+            },
+          ],
+        },
+      }),
+    ]);
+  });
+
+  it('extracts phishing URL signals from D-bank metadata with the core mapper', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('phishing_url_observed', 100, {
+          source: 'clipboard',
+          url: 'https://gosuslugi-confirm.com',
+        }),
+      ]).map((signal) => [signal.kind, signal.contribution, signal.reasonCodes?.[0], signal.metadata?.source]),
+    ).toEqual([
+      ['phishing_url', undefined, 'phishing_url_clipboard_gosuslugi_typosquat', 'clipboard'],
+      ['composite_risk_boost', 20, 'phishing_url_step_up_floor', 'clipboard'],
+    ]);
+  });
+
+  it('does not extract phishing URL risk for allowlisted D-bank URL metadata', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('phishing_url_observed', 100, {
+          url: 'https://sberbank.ru/online',
         }),
       ]),
     ).toEqual([]);

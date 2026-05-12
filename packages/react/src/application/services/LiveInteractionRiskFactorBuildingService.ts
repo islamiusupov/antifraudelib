@@ -1,6 +1,10 @@
 import {
+  DevEnvironmentSignalBuildingService,
   FactorContributionBuildingService,
   KeystrokeDynamicsSignalBuildingService,
+  PageVisibilitySignalBuildingService,
+  PhishingUrlSignalBuildingService,
+  PointerPatternSignalBuildingService,
   WarningDwellSignalBuildingService,
   type RiskFactorEntity,
   type RiskSignalEntity,
@@ -13,6 +17,10 @@ export class LiveInteractionRiskFactorBuildingService {
     private readonly factorContributionBuildingService = new FactorContributionBuildingService(),
     private readonly warningDwellSignalBuildingService = new WarningDwellSignalBuildingService(),
     private readonly keystrokeDynamicsSignalBuildingService = new KeystrokeDynamicsSignalBuildingService(),
+    private readonly devEnvironmentSignalBuildingService = new DevEnvironmentSignalBuildingService(),
+    private readonly pointerPatternSignalBuildingService = new PointerPatternSignalBuildingService(),
+    private readonly phishingUrlSignalBuildingService = new PhishingUrlSignalBuildingService(),
+    private readonly pageVisibilitySignalBuildingService = new PageVisibilitySignalBuildingService(),
   ) {}
 
   build(events: LiveInteractionEventEntity[]): RiskFactorEntity[] {
@@ -26,30 +34,31 @@ export class LiveInteractionRiskFactorBuildingService {
     this.pushIfPresent(signals, events, 'amount_pasted', 'copy_paste_amount', ['copy_paste_amount']);
     this.pushIfPresent(signals, events, 'form_fill_order_observed', 'form_fill_order', ['multi_field_recipient_bulk_fill']);
     signals.push(...this.warningDwellSignalBuildingService.build(this.warningDwellObservations(events)));
-    if (this.has(events, 'page_hidden') && this.has(events, 'page_visible')) {
-      signals.push(this.signal('page_visibility', ['page_visibility_oscillation'], 0.8));
-    }
-    const pointerPatternReasonCodes = [
-      ...(this.has(events, 'pointer_anomaly_observed') ? ['pointer_pattern_anomaly'] : []),
-      ...(this.has(events, 'rapid_scroll_observed') ? ['rapid_scroll_pattern'] : []),
-      ...(this.has(events, 'click_burst_observed') ? ['click_burst_pattern'] : []),
-    ];
-    if (pointerPatternReasonCodes.length > 0) {
-      signals.push(this.signal(
-        'pointer_pattern',
-        pointerPatternReasonCodes,
-        this.has(events, 'click_burst_observed') ? 1 : 0.8,
-      ));
-    }
+    signals.push(...this.pageVisibilitySignalBuildingService.build(
+      this.pageVisibilityReasonCodes(events),
+      this.pageVisibilityMetadata(events),
+    ));
+    signals.push(...this.pointerPatternSignalBuildingService.build(
+      this.pointerReasonCodes(events),
+      this.pointerMetadata(events),
+    ));
     signals.push(...this.keystrokeDynamicsSignalBuildingService.build(
       this.keystrokeReasonCodes(events),
       this.keystrokeMetadata(events),
     ));
     this.pushIfPresent(signals, events, 'phishing_text_observed', 'phishing_text_dom', ['phishing_text_dom']);
+    signals.push(...this.phishingUrlSignalBuildingService.build(
+      this.eventReasonCodesForKind(events, 'phishing_url_observed', 'phishing_url_pattern'),
+      this.eventMetadata(events, 'phishing_url_observed'),
+    ));
     this.pushIfPresent(signals, events, 'native_tampering_observed', 'native_tampering', ['native_tampering']);
-    this.pushIfPresent(signals, events, 'dev_environment_observed', 'dev_environment', ['dev_environment']);
+    signals.push(...this.devEnvironmentSignalBuildingService.build(
+      this.eventReasonCodesForKind(events, 'dev_environment_observed', 'dev_environment'),
+      this.eventMetadata(events, 'dev_environment_observed'),
+    ));
     this.pushIfPresent(signals, events, 'client_environment_observed', 'client_environment', ['client_environment'], 0.8);
     this.pushIfPresent(signals, events, 'environment_conflict_observed', 'environment_conflicts', ['environment_conflicts'], 0.9);
+    this.pushReasonedIfPresent(signals, events, 'device_fingerprint_observed', 'device_fingerprint', 'device_fingerprint');
 
     return signals;
   }
@@ -63,7 +72,24 @@ export class LiveInteractionRiskFactorBuildingService {
     confidence = 1,
   ): void {
     if (!this.has(events, eventKind)) return;
-    signals.push(this.signal(factorKind, reasonCodes, confidence, { eventCount: this.count(events, eventKind) }));
+    signals.push(this.signal(factorKind, reasonCodes, confidence, this.eventMetadata(events, eventKind)));
+  }
+
+  private pushReasonedIfPresent(
+    signals: RiskSignalEntity[],
+    events: LiveInteractionEventEntity[],
+    eventKind: LiveInteractionEventEntity['kind'],
+    factorKind: RiskSignalEntity['kind'],
+    fallbackReasonCode: string,
+    confidence = 1,
+  ): void {
+    if (!this.has(events, eventKind)) return;
+    signals.push(this.signal(
+      factorKind,
+      this.eventReasonCodesForKind(events, eventKind, fallbackReasonCode),
+      confidence,
+      this.eventMetadata(events, eventKind),
+    ));
   }
 
   private signal(
@@ -102,13 +128,90 @@ export class LiveInteractionRiskFactorBuildingService {
   }
 
   private keystrokeMetadata(events: LiveInteractionEventEntity[]): Record<string, unknown> {
-    const observations = events
-      .filter((event) => event.kind === 'keystroke_anomaly_observed' && this.isMetadataRecord(event.metadata))
+    return this.eventMetadata(events, 'keystroke_anomaly_observed');
+  }
+
+  private pageVisibilityReasonCodes(events: LiveInteractionEventEntity[]): string[] {
+    return this.pageVisibilityEvents(events)
+      .reduce<string[]>((reasonCodes, event) => [
+        ...reasonCodes,
+        ...this.eventReasonCodes(event.metadata, ''),
+      ], []);
+  }
+
+  private pageVisibilityMetadata(events: LiveInteractionEventEntity[]): Record<string, unknown> {
+    const pageVisibilityEvents = this.pageVisibilityEvents(events);
+    const observations = pageVisibilityEvents
+      .filter((event) => this.isMetadataRecord(event.metadata))
       .map((event) => event.metadata as Record<string, unknown>);
     const latestMetadata = observations.length > 0 ? observations[observations.length - 1] : {};
     return {
       ...latestMetadata,
-      eventCount: this.count(events, 'keystroke_anomaly_observed'),
+      eventCount: pageVisibilityEvents.length,
+      hiddenCount: this.count(events, 'page_hidden'),
+      visibleCount: this.count(events, 'page_visible'),
+      observedCount: this.count(events, 'page_visibility_observed'),
+      observations,
+    };
+  }
+
+  private pageVisibilityEvents(events: LiveInteractionEventEntity[]): LiveInteractionEventEntity[] {
+    return events.filter((event) => (
+      event.kind === 'page_hidden' ||
+      event.kind === 'page_visible' ||
+      event.kind === 'page_visibility_observed'
+    ));
+  }
+
+  private pointerReasonCodes(events: LiveInteractionEventEntity[]): string[] {
+    return [
+      ...this.eventReasonCodesForKind(events, 'pointer_anomaly_observed', 'pointer_pattern_anomaly'),
+      ...this.eventReasonCodesForKind(events, 'rapid_scroll_observed', 'rapid_scroll_pattern'),
+      ...this.eventReasonCodesForKind(events, 'click_burst_observed', 'click_burst_pattern'),
+    ];
+  }
+
+  private pointerMetadata(events: LiveInteractionEventEntity[]): Record<string, unknown> {
+    const pointerEvents = events.filter((event) => (
+      event.kind === 'pointer_anomaly_observed' ||
+      event.kind === 'rapid_scroll_observed' ||
+      event.kind === 'click_burst_observed'
+    ));
+    const observations = pointerEvents
+      .filter((event) => this.isMetadataRecord(event.metadata))
+      .map((event) => event.metadata as Record<string, unknown>);
+    const latestMetadata = observations.length > 0 ? observations[observations.length - 1] : {};
+    return {
+      ...latestMetadata,
+      eventCount: pointerEvents.length,
+      observations,
+    };
+  }
+
+  private eventReasonCodesForKind(
+    events: LiveInteractionEventEntity[],
+    kind: LiveInteractionEventEntity['kind'],
+    fallback: string,
+  ): string[] {
+    return events
+      .filter((event) => event.kind === kind)
+      .reduce<string[]>((reasonCodes, event) => [
+        ...reasonCodes,
+        ...this.eventReasonCodes(event.metadata, fallback),
+      ], []);
+  }
+
+  private eventMetadata(
+    events: LiveInteractionEventEntity[],
+    kind: LiveInteractionEventEntity['kind'],
+  ): Record<string, unknown> {
+    const observations = events
+      .filter((event) => event.kind === kind && this.isMetadataRecord(event.metadata))
+      .map((event) => event.metadata as Record<string, unknown>);
+    const latestMetadata = observations.length > 0 ? observations[observations.length - 1] : {};
+    return {
+      ...latestMetadata,
+      eventCount: this.count(events, kind),
       observations,
     };
   }

@@ -14,6 +14,7 @@ export type LiveInteractionTargetEntity = {
   process?: {
     versions?: Record<string, string | undefined>;
   };
+  callPhantom?: unknown;
   hasDevtoolsHook?: boolean;
   functionToStringTampered?: boolean;
 };
@@ -22,8 +23,10 @@ export type LiveInteractionDocumentEntity = {
   body?: {
     innerText?: string;
     textContent?: string;
+    querySelectorAll?(selector: string): ArrayLike<unknown>;
   };
   visibilityState?: 'hidden' | 'visible' | 'prerender' | string;
+  querySelectorAll?(selector: string): ArrayLike<unknown>;
   addEventListener(type: string, listener: (event: LiveInteractionDomEventEntity) => void): void;
   removeEventListener(type: string, listener: (event: LiveInteractionDomEventEntity) => void): void;
 };
@@ -45,6 +48,11 @@ export type LiveInteractionDomEventEntity = {
   };
   clientX?: number;
   clientY?: number;
+  pointerType?: string;
+  buttons?: number;
+  button?: number;
+  movementX?: number;
+  movementY?: number;
   deltaX?: number;
   deltaY?: number;
   key?: string;

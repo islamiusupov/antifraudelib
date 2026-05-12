@@ -49,6 +49,33 @@ describe('KeystrokeDynamicsSignalBuildingService', () => {
       ]);
   });
 
+  it('marks KST-16 one-hand typing as a false-positive-risk step-up pattern', () => {
+    const service = new KeystrokeDynamicsSignalBuildingService();
+
+    expect(service.build(['one_hand_typing_pattern'], { injuryReported: true })).toEqual([
+      expect.objectContaining({
+        kind: 'keystroke_dynamics',
+        confidence: 1,
+        reasonCodes: ['one_hand_typing_pattern'],
+        metadata: {
+          injuryReported: true,
+          falsePositiveRisk: true,
+        },
+      }),
+      expect.objectContaining({
+        kind: 'composite_risk_boost',
+        contribution: 30,
+        maxContribution: 30,
+        reasonCodes: ['keystroke_step_up_floor'],
+        metadata: {
+          injuryReported: true,
+          falsePositiveRisk: true,
+          matchedReasonCodes: ['one_hand_typing_pattern'],
+        },
+      }),
+    ]);
+  });
+
   it('ignores ONNX not-user verdicts below the strict confidence threshold', () => {
     const service = new KeystrokeDynamicsSignalBuildingService();
 
@@ -90,6 +117,7 @@ describe('KeystrokeDynamicsSignalBuildingService', () => {
     ['local_baseline_slow_cadence_match', { cadenceRatio: 1.6, patternStayedLocal: true }],
     ['local_baseline_fast_cadence_match', { cadenceRatio: 0.6, patternStayedLocal: true }],
     ['onnx_user_match_high_confidence', { confidence: 0.86, verdict: 'match' }],
+    ['voice_to_text_no_keystroke_factor', { inputMethod: 'voice_to_text' }],
   ])('keeps allow reason %s out of risk signals', (reasonCode, metadata) => {
     const service = new KeystrokeDynamicsSignalBuildingService();
 

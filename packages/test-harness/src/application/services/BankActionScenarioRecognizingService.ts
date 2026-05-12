@@ -1,5 +1,9 @@
 import {
+  DevEnvironmentSignalBuildingService,
   KeystrokeDynamicsSignalBuildingService,
+  PageVisibilitySignalBuildingService,
+  PhishingUrlSignalBuildingService,
+  PointerPatternSignalBuildingService,
   WarningDwellSignalBuildingService,
   type RiskFactorKind,
   type RiskSignalEntity,
@@ -22,6 +26,10 @@ export class BankActionScenarioRecognizingService {
     private readonly compositeScenarioRecognizingService = new CompositeScenarioRecognizingService(),
     private readonly warningDwellSignalBuildingService = new WarningDwellSignalBuildingService(),
     private readonly keystrokeDynamicsSignalBuildingService = new KeystrokeDynamicsSignalBuildingService(),
+    private readonly devEnvironmentSignalBuildingService = new DevEnvironmentSignalBuildingService(),
+    private readonly pointerPatternSignalBuildingService = new PointerPatternSignalBuildingService(),
+    private readonly phishingUrlSignalBuildingService = new PhishingUrlSignalBuildingService(),
+    private readonly pageVisibilitySignalBuildingService = new PageVisibilitySignalBuildingService(),
   ) {}
 
   recognize(actions: BankActionEntity[], catalog: ParsedScenarioCatalogEntity): ScenarioRecognitionResultEntity {
@@ -91,46 +99,53 @@ export class BankActionScenarioRecognizingService {
       );
     }
     if (this.hasAction(actions, 'recipient_pasted')) {
-      recognitions.push(this.createRecognition('copy_paste_recipient', 1, ['copy_paste_recipient'], catalog));
+      recognitions.push(this.createRecognition(
+        'copy_paste_recipient',
+        1,
+        ['copy_paste_recipient'],
+        catalog,
+        { metadata: this.optionalActionMetadata(actions, 'recipient_pasted') },
+      ));
     }
     if (this.hasAction(actions, 'amount_pasted')) {
-      recognitions.push(this.createRecognition('copy_paste_amount', 1, ['copy_paste_amount'], catalog));
+      recognitions.push(this.createRecognition(
+        'copy_paste_amount',
+        1,
+        ['copy_paste_amount'],
+        catalog,
+        { metadata: this.optionalActionMetadata(actions, 'amount_pasted') },
+      ));
     }
     recognitions.push(...this.warningDwellRecognitions(actions, catalog));
     if (this.hasAction(actions, 'form_fill_order_observed')) {
       recognitions.push(this.createRecognition('form_fill_order', 1, ['multi_field_recipient_bulk_fill'], catalog));
     }
-    if (this.hasAction(actions, 'page_hidden') && this.hasAction(actions, 'page_visible')) {
-      recognitions.push(this.createRecognition('page_visibility', 0.8, ['page_visibility_oscillation'], catalog));
-    }
+    recognitions.push(...this.pageVisibilityRecognitions(actions, catalog));
     if (this.hasAction(actions, 'visual_challenge_started')) {
       recognitions.push(this.createRecognition('visual_challenge', 1, ['visual_challenge_started'], catalog));
     }
     recognitions.push(...this.keystrokeDynamicsRecognitions(actions, catalog));
-    if (this.hasAction(actions, 'pointer_anomaly_observed')) {
-      recognitions.push(this.createRecognition('pointer_pattern', 0.8, ['pointer_pattern_anomaly'], catalog));
-    }
-    if (this.hasAction(actions, 'rapid_scroll_observed')) {
-      recognitions.push(this.createRecognition('pointer_pattern', 0.8, ['rapid_scroll_pattern'], catalog));
-    }
-    if (this.hasAction(actions, 'click_burst_observed')) {
-      recognitions.push(this.createRecognition('pointer_pattern', 1, ['click_burst_pattern'], catalog));
+    recognitions.push(...this.pointerPatternRecognitions(actions, catalog));
+    if (this.hasAction(actions, 'screen_sharing_observed')) {
+      recognitions.push(this.createRecognition(
+        'screen_sharing',
+        1,
+        this.eventReasonCodes(actions, 'screen_sharing_observed', 'screen_sharing_heuristic'),
+        catalog,
+        { metadata: this.actionMetadata(actions, 'screen_sharing_observed') },
+      ));
     }
     if (this.hasAction(actions, 'native_tampering_observed')) {
       recognitions.push(this.createRecognition('native_tampering', 1, ['native_tampering'], catalog));
     }
-    if (this.hasAction(actions, 'dev_environment_observed')) {
-      recognitions.push(this.createRecognition('dev_environment', 1, ['dev_environment'], catalog));
-    }
+    recognitions.push(...this.devEnvironmentRecognitions(actions, catalog));
     if (this.hasAction(actions, 'bot_detected')) {
       recognitions.push(this.createRecognition('bot_detection', 1, ['bot_detection'], catalog));
     }
     if (this.hasAction(actions, 'phishing_text_observed')) {
       recognitions.push(this.createRecognition('phishing_text_dom', 1, ['phishing_text_dom'], catalog));
     }
-    if (this.hasAction(actions, 'phishing_url_observed')) {
-      recognitions.push(this.createRecognition('phishing_url', 1, ['phishing_url_pattern'], catalog));
-    }
+    recognitions.push(...this.phishingUrlRecognitions(actions, catalog));
     if (this.hasAction(actions, 'token_injection_observed')) {
       recognitions.push(this.createRecognition('recent_token_injection', 1, ['recent_token_injection'], catalog));
     }
@@ -141,7 +156,13 @@ export class BankActionScenarioRecognizingService {
       recognitions.push(this.createRecognition('environment_conflicts', 0.9, ['environment_conflicts'], catalog));
     }
     if (this.hasAction(actions, 'device_fingerprint_observed')) {
-      recognitions.push(this.createRecognition('device_fingerprint', 1, ['device_fingerprint'], catalog));
+      recognitions.push(this.createRecognition(
+        'device_fingerprint',
+        1,
+        this.eventReasonCodes(actions, 'device_fingerprint_observed', 'device_fingerprint'),
+        catalog,
+        { metadata: this.optionalActionMetadata(actions, 'device_fingerprint_observed') },
+      ));
     }
 
     const serverFactorActions = actions.filter((action) => action.kind === 'server_factor_observed');
@@ -361,6 +382,148 @@ export class BankActionScenarioRecognizingService {
       ));
   }
 
+  private pageVisibilityRecognitions(
+    actions: BankActionEntity[],
+    catalog: ParsedScenarioCatalogEntity,
+  ): ScenarioRecognitionEntity[] {
+    return this.pageVisibilitySignalBuildingService
+      .build(this.pageVisibilityReasonCodes(actions), this.pageVisibilityMetadata(actions))
+      .map((signal) => this.createRecognition(
+        signal.kind,
+        signal.confidence ?? 1,
+        signal.reasonCodes ?? [signal.kind],
+        catalog,
+        {
+          contribution: signal.contribution,
+          maxContribution: signal.maxContribution,
+          metadata: signal.metadata,
+        },
+      ));
+  }
+
+  private devEnvironmentRecognitions(
+    actions: BankActionEntity[],
+    catalog: ParsedScenarioCatalogEntity,
+  ): ScenarioRecognitionEntity[] {
+    return this.devEnvironmentSignalBuildingService
+      .build(
+        this.eventReasonCodes(actions, 'dev_environment_observed', 'dev_environment'),
+        this.actionMetadata(actions, 'dev_environment_observed'),
+      )
+      .map((signal) => this.createRecognition(
+        signal.kind,
+        signal.confidence ?? 1,
+        signal.reasonCodes ?? [signal.kind],
+        catalog,
+        {
+          contribution: signal.contribution,
+          maxContribution: signal.maxContribution,
+          metadata: signal.metadata,
+        },
+      ));
+  }
+
+  private pointerPatternRecognitions(
+    actions: BankActionEntity[],
+    catalog: ParsedScenarioCatalogEntity,
+  ): ScenarioRecognitionEntity[] {
+    return this.pointerPatternSignalBuildingService
+      .build(
+        this.pointerReasonCodes(actions),
+        this.pointerMetadata(actions),
+      )
+      .map((signal) => this.createRecognition(
+        signal.kind,
+        signal.confidence ?? 1,
+        signal.reasonCodes ?? [signal.kind],
+        catalog,
+        {
+          contribution: signal.contribution,
+          maxContribution: signal.maxContribution,
+          metadata: signal.metadata,
+        },
+      ));
+  }
+
+  private phishingUrlRecognitions(
+    actions: BankActionEntity[],
+    catalog: ParsedScenarioCatalogEntity,
+  ): ScenarioRecognitionEntity[] {
+    return this.phishingUrlSignalBuildingService
+      .build(
+        this.eventReasonCodes(actions, 'phishing_url_observed', 'phishing_url_pattern'),
+        this.actionMetadata(actions, 'phishing_url_observed'),
+      )
+      .map((signal) => this.createRecognition(
+        signal.kind,
+        signal.confidence ?? 1,
+        signal.reasonCodes ?? [signal.kind],
+        catalog,
+        {
+          contribution: signal.contribution,
+          maxContribution: signal.maxContribution,
+          metadata: signal.metadata,
+        },
+      ));
+  }
+
+  private pointerReasonCodes(actions: BankActionEntity[]): string[] {
+    return [
+      ...this.eventReasonCodes(actions, 'pointer_anomaly_observed', 'pointer_pattern_anomaly'),
+      ...this.eventReasonCodes(actions, 'rapid_scroll_observed', 'rapid_scroll_pattern'),
+      ...this.eventReasonCodes(actions, 'click_burst_observed', 'click_burst_pattern'),
+    ];
+  }
+
+  private pageVisibilityReasonCodes(actions: BankActionEntity[]): string[] {
+    return this.pageVisibilityActions(actions)
+      .reduce<string[]>((reasonCodes, action) => [
+        ...reasonCodes,
+        ...this.metadataReasonCodes(action.metadata, ''),
+      ], []);
+  }
+
+  private pageVisibilityMetadata(actions: BankActionEntity[]): Record<string, unknown> {
+    const pageVisibilityActions = this.pageVisibilityActions(actions);
+    const observations = pageVisibilityActions
+      .filter((action) => this.isMetadataRecord(action.metadata))
+      .map((action) => action.metadata as Record<string, unknown>);
+    const latestMetadata = observations.length > 0 ? observations[observations.length - 1] : {};
+    return {
+      ...latestMetadata,
+      eventCount: pageVisibilityActions.length,
+      hiddenCount: this.countActions(actions, 'page_hidden'),
+      visibleCount: this.countActions(actions, 'page_visible'),
+      observedCount: this.countActions(actions, 'page_visibility_observed'),
+      observations,
+    };
+  }
+
+  private pageVisibilityActions(actions: BankActionEntity[]): BankActionEntity[] {
+    return actions.filter((action) => (
+      action.kind === 'page_hidden' ||
+      action.kind === 'page_visible' ||
+      action.kind === 'page_visibility_observed'
+    ));
+  }
+
+  private pointerMetadata(actions: BankActionEntity[]): Record<string, unknown> {
+    const pointerActions = actions.filter((action) => (
+      action.kind === 'pointer_anomaly_observed' ||
+      action.kind === 'rapid_scroll_observed' ||
+      action.kind === 'click_burst_observed'
+    ));
+    const observations = pointerActions
+      .filter((action) => this.isMetadataRecord(action.metadata))
+      .map((action) => action.metadata as Record<string, unknown>);
+    const latestMetadata = observations.length > 0 ? observations[observations.length - 1] : {};
+    return {
+      ...latestMetadata,
+      eventCount: pointerActions.length,
+      observations,
+    };
+  }
+
   private warningDwellObservations(actions: BankActionEntity[]): WarningDwellObservationEntity[] {
     return actions.filter((action): action is WarningDwellObservationEntity => (
       action.kind === 'warning_shown' ||
@@ -396,6 +559,14 @@ export class BankActionScenarioRecognizingService {
       eventCount: this.countActions(actions, kind),
       observations,
     };
+  }
+
+  private optionalActionMetadata(
+    actions: BankActionEntity[],
+    kind: BankActionEntity['kind'],
+  ): Record<string, unknown> | undefined {
+    if (!actions.some((action) => action.kind === kind && this.isMetadataRecord(action.metadata))) return undefined;
+    return this.actionMetadata(actions, kind);
   }
 
   private metadataReasonCodes(metadata: BankActionEntity['metadata'], fallback: string): string[] {

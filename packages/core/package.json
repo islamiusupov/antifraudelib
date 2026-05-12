@@ -1,11 +1,16 @@
 {
   "name": "@deepcode/antifraud-core",
-  "version": "0.0.0",
+  "version": "0.0.4",
   "description": "Framework-agnostic antifraud domain and application core.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "registry": "http://antifraud.deep-code.ai/verdaccio/"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json"
-  },
-  "private": true
+  }
 }

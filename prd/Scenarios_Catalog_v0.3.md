@@ -29,7 +29,7 @@ Verdict-уровни как в PRD: `allow` (0–29) / `monitor` (30–59) / `st
 
 | # | Type | Сценарий | Verdict |
 |---|---|---|---|
-| 1 | TP | Жертва получила IBAN в WhatsApp от "службы безопасности", скопировала и вставила в поле | step_up |
+| 1 | TP | Жертва получила IBAN в WhatsApp от "службы безопасности", скопировала и вставила в поле | step_up | - ok
 | 2 | TP | Юзер вставил номер карты получателя из буфера обмена; до этого не было событий копирования из контактов | step_up |
 | 3 | TP | Вставка расчётного счёта юр.лица; юзер физлицо без истории B2B-платежей | step_up |
 | 4 | TP | Вставка номера телефона СБП; в clipboard history несколько разных номеров за час | step_up |
@@ -268,7 +268,7 @@ Verdict-уровни как в PRD: `allow` (0–29) / `monitor` (30–59) / `st
 | 20 | COMP | DevTools + phishing_text_dom hit на console output | block |
 
 ---
-
+шз
 ## 9. `bot_detection` (weight 50)
 
 **Что детектит:** Автоматизированные клиенты (Selenium, Puppeteer, Playwright, PhantomJS, headless Chrome).

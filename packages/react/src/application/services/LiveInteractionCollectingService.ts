@@ -1,7 +1,15 @@
+import { PhishingUrlPatternMatchingService } from '@deepcode/antifraud-core';
 import type { LiveInteractionCollectingConfigEntity } from '../../domain/live/entities/LiveInteractionCollectingConfigEntity';
+import type { PointerPatternVerdictEntity } from '../../domain/live/entities/PointerPatternVerdictEntity';
 import type { LiveInteractionDomEventEntity, LiveInteractionTargetEntity } from '../../domain/live/entities/LiveInteractionTargetEntity';
+import { FieldInputCollectingService } from './FieldInputCollectingService';
 import { KeystrokeInteractionCollectingService } from './KeystrokeInteractionCollectingService';
+import {
+  PageVisibilityPatternCollectingService,
+  type PageVisibilityPatternCollectingState,
+} from './PageVisibilityPatternCollectingService';
 import { PhishingTextPatternMatchingService } from './PhishingTextPatternMatchingService';
+import { PointerMovementCollectingService } from './PointerMovementCollectingService';
 import { SpeechTranscriptCollectingService } from './SpeechTranscriptCollectingService';
 
 type UninstallingLiveInteractionCollection = () => void;
@@ -19,6 +27,9 @@ type RecipientBulkFillTrackingState = {
   records: RecipientBulkFillRecord[];
 };
 
+const AUTH_FIELD_PATTERN = /(auth|credential|login|log-in|signin|sign-in|password|passwd|username|user-name|email|e-mail|otp|one[-_\s]?time[-_\s]?code)/i;
+const AUTH_AUTOCOMPLETE_PATTERN = /^(username|current-password|new-password|one-time-code)$/i;
+
 const AMOUNT_FIELD_PATTERN = /(amount|sum|total|price|payment|rub|ruble|₽|сумм|руб)/i;
 const RECIPIENT_BULK_FIELD_PATTERN = /(recipient|beneficiary|receiver|iban|bic|bik|swift|account|card|phone|bank|holder|inn|получател|счет|счёт|карта|телефон|бик|банк)/i;
 const RECIPIENT_FIELD_PATTERN = /(recipient|beneficiary|iban|account|card|phone|получател|счет|счёт|карта|телефон)/i;
@@ -35,7 +46,11 @@ export class LiveInteractionCollectingService {
   constructor(
     private readonly keystrokeInteractionCollectingService = new KeystrokeInteractionCollectingService(),
     private readonly phishingTextPatternMatchingService = new PhishingTextPatternMatchingService(),
+    private readonly phishingUrlPatternMatchingService = new PhishingUrlPatternMatchingService(),
     private readonly speechTranscriptCollectingService = new SpeechTranscriptCollectingService(),
+    private readonly pointerMovementCollectingService = new PointerMovementCollectingService(),
+    private readonly fieldInputCollectingService = new FieldInputCollectingService(),
+    private readonly pageVisibilityPatternCollectingService = new PageVisibilityPatternCollectingService(),
   ) {}
 
   install(config: LiveInteractionCollectingConfigEntity): UninstallingLiveInteractionCollection {
@@ -43,69 +58,81 @@ export class LiveInteractionCollectingService {
     const documentTarget = target.document;
     const windowTarget = target.window;
     const uninstallers: UninstallingLiveInteractionCollection[] = [];
-    let previousPointer: { x: number; y: number; atMs: number } | undefined;
     let rapidScrollTimes: number[] = [];
     let clickTimes: number[] = [];
     const keystrokeState = this.keystrokeInteractionCollectingService.createState();
-    const inputStates = new WeakMap<object, FieldInputTrackingState>();
-    const recipientBulkFillTrackingState: RecipientBulkFillTrackingState = { records: [] };
+    const pointerState = this.pointerMovementCollectingService.createState();
+    const inputStates = this.fieldInputCollectingService.createInputStates();
+    const recipientBulkFillTrackingState = this.fieldInputCollectingService.createRecipientBulkFillTrackingState();
+    const pageVisibilityState = this.pageVisibilityPatternCollectingService.createState();
 
     if (documentTarget !== undefined) {
       const handlePaste = (event: LiveInteractionDomEventEntity) => {
-        const targetDescriptor = this.targetDescriptor(event.target);
+        if (this.fieldInputCollectingService.isAuthenticationTarget(event.target)) return;
+        const atMs = this.now(config);
         const pastedText = event.clipboardData?.getData('text') ?? '';
-        if (this.isRecipientTarget(targetDescriptor, pastedText)) {
-          this.recordRecipientPaste(inputStates, event.target, pastedText);
-          this.recordRecipientBulkFill(config, recipientBulkFillTrackingState, event.target);
-          this.emit(config, 'recipient_pasted', {
-            targetText: targetDescriptor,
-            pastedLength: pastedText.length,
+        this.scanText(config, pastedText, 'clipboard');
+        this.fieldInputCollectingService
+          .collectPasteEvents(inputStates, recipientBulkFillTrackingState, event.target, pastedText, atMs)
+          .forEach((collectedEvent) => {
+            this.emitPageVisibilityAction(config, pageVisibilityState, target, collectedEvent.kind, event.target, atMs);
+            this.emit(config, collectedEvent.kind, collectedEvent.metadata);
           });
-          return;
-        }
-        if (this.isAmountPaste(event.target, targetDescriptor, pastedText)) {
-          this.recordAmountPaste(inputStates, event.target, pastedText);
-          this.emit(config, 'amount_pasted', {
-            targetText: targetDescriptor,
-            pastedLength: pastedText.length,
-          });
-        }
       };
       const handleVisibilityChange = () => {
-        this.emit(config, documentTarget.visibilityState === 'hidden' ? 'page_hidden' : 'page_visible');
+        this.emitPageVisibilityTransition(
+          config,
+          pageVisibilityState,
+          target,
+          documentTarget.visibilityState === 'hidden' ? 'page_hidden' : 'page_visible',
+          'document_visibilitychange',
+        );
       };
       const handlePointerMove = (event: LiveInteractionDomEventEntity) => {
         if (event.clientX === undefined || event.clientY === undefined) return;
         const atMs = this.now(config);
-        const threshold = config.pointerJumpThresholdPx ?? 800;
-        if (previousPointer !== undefined) {
-          const distance = Math.hypot(event.clientX - previousPointer.x, event.clientY - previousPointer.y);
-          const elapsedMs = atMs - previousPointer.atMs;
-          if (distance >= threshold && elapsedMs <= 100) {
-            this.emit(config, 'pointer_anomaly_observed', {
-              distance,
-              elapsedMs,
-            });
-          }
-        }
-        previousPointer = { x: event.clientX, y: event.clientY, atMs };
+        const verdict = this.pointerMovementCollectingService.recordPointerMove(
+          pointerState,
+          event,
+          atMs,
+          {
+            maxTouchPoints: target.navigator?.maxTouchPoints,
+            pointerJumpThresholdPx: config.pointerJumpThresholdPx,
+          },
+        );
+        this.emitPointerVerdict(config, verdict);
+      };
+      const handlePointerDown = (event: LiveInteractionDomEventEntity) => {
+        this.pointerMovementCollectingService.recordPointerDown(pointerState, this.now(config));
+      };
+      const handlePointerUp = (event: LiveInteractionDomEventEntity) => {
+        this.pointerMovementCollectingService.recordPointerUp(pointerState, this.now(config));
       };
       const handleKeyDown = (event: LiveInteractionDomEventEntity) => {
-        this.recordTypedKey(inputStates, event.target, event.key);
+        if (this.fieldInputCollectingService.isAuthenticationTarget(event.target)) return;
+        const atMs = this.now(config);
+        this.recordPaymentFormActivity(pageVisibilityState, event.target, atMs);
+        this.emitPageVisibilityAction(config, pageVisibilityState, target, 'keydown', event.target, atMs);
+        this.fieldInputCollectingService.recordTypedKey(inputStates, event.target, event.key);
         this.keystrokeInteractionCollectingService.recordKeyDown(
           {
             ...config,
-            isCorrectionExpectedTarget: (candidateTarget) => this.isCorrectionExpectedTarget(candidateTarget),
+            isCorrectionExpectedTarget: (candidateTarget) => (
+              this.fieldInputCollectingService.isCorrectionExpectedTarget(candidateTarget)
+            ),
           },
           keystrokeState,
           event,
         );
       };
       const handleKeyUp = (event: LiveInteractionDomEventEntity) => {
+        if (this.fieldInputCollectingService.isAuthenticationTarget(event.target)) return;
         this.keystrokeInteractionCollectingService.recordKeyUp(
           {
             ...config,
-            isCorrectionExpectedTarget: (candidateTarget) => this.isCorrectionExpectedTarget(candidateTarget),
+            isCorrectionExpectedTarget: (candidateTarget) => (
+              this.fieldInputCollectingService.isCorrectionExpectedTarget(candidateTarget)
+            ),
           },
           keystrokeState,
           event,
@@ -130,6 +157,28 @@ export class LiveInteractionCollectingService {
       };
       const handleClick = (event: LiveInteractionDomEventEntity) => {
         const atMs = this.now(config);
+        const isConfirmClick = CONFIRM_TEXT_PATTERN.test(this.fieldInputCollectingService.targetText(event.target));
+        this.recordPaymentFormActivity(pageVisibilityState, event.target, atMs);
+        this.emitPageVisibilityAction(
+          config,
+          pageVisibilityState,
+          target,
+          isConfirmClick ? 'confirm_click' : 'input',
+          event.target,
+          atMs,
+        );
+        this.emitPointerVerdict(
+          config,
+          this.pointerMovementCollectingService.recordClick(
+            pointerState,
+            event,
+            atMs,
+            {
+              maxTouchPoints: target.navigator?.maxTouchPoints,
+              pointerJumpThresholdPx: config.pointerJumpThresholdPx,
+            },
+          ),
+        );
         const windowMs = config.clickBurstWindowMs ?? DEFAULT_CLICK_BURST_WINDOW_MS;
         clickTimes = [...clickTimes.filter((clickAtMs) => atMs - clickAtMs <= windowMs), atMs];
         if (clickTimes.length >= (config.clickBurstMinimumEvents ?? DEFAULT_CLICK_BURST_MINIMUM_EVENTS)) {
@@ -139,19 +188,35 @@ export class LiveInteractionCollectingService {
           });
           clickTimes = [];
         }
-        if (CONFIRM_TEXT_PATTERN.test(this.targetText(event.target))) {
+        if (isConfirmClick) {
           this.emit(config, 'warning_confirmed');
+          this.emitPointerVerdict(config, this.pointerMovementCollectingService.recordFormSubmit(pointerState, atMs));
         }
       };
       const handleInput = (event: LiveInteractionDomEventEntity) => {
-        this.detectRecipientFilledWithoutTyping(config, inputStates, recipientBulkFillTrackingState, event.target);
-        this.detectAmountFilledWithoutTyping(config, inputStates, event.target);
-        this.scanText(config, this.targetText(event.target), 'input');
+        if (this.fieldInputCollectingService.isAuthenticationTarget(event.target)) return;
+        const atMs = this.now(config);
+        this.recordPaymentFormActivity(pageVisibilityState, event.target, atMs);
+        this.emitPageVisibilityAction(config, pageVisibilityState, target, 'input', event.target, atMs);
+        this.pointerMovementCollectingService.recordFormInteraction(
+          pointerState,
+          atMs,
+          this.hasWarningTextInDocument(target) || this.formRequiresReadingTarget(event.target),
+        );
+        this.fieldInputCollectingService
+          .collectInputEvents(inputStates, recipientBulkFillTrackingState, event.target, atMs)
+          .forEach((collectedEvent) => {
+            this.emitPageVisibilityAction(config, pageVisibilityState, target, collectedEvent.kind, event.target, atMs);
+            this.emit(config, collectedEvent.kind, collectedEvent.metadata);
+          });
+        this.scanText(config, this.fieldInputCollectingService.targetText(event.target), 'input');
       };
 
       documentTarget.addEventListener('paste', handlePaste);
       documentTarget.addEventListener('visibilitychange', handleVisibilityChange);
       documentTarget.addEventListener('pointermove', handlePointerMove);
+      documentTarget.addEventListener('pointerdown', handlePointerDown);
+      documentTarget.addEventListener('pointerup', handlePointerUp);
       documentTarget.addEventListener('keydown', handleKeyDown);
       documentTarget.addEventListener('keyup', handleKeyUp);
       documentTarget.addEventListener('wheel', handleWheel);
@@ -162,6 +227,8 @@ export class LiveInteractionCollectingService {
         documentTarget.removeEventListener('paste', handlePaste);
         documentTarget.removeEventListener('visibilitychange', handleVisibilityChange);
         documentTarget.removeEventListener('pointermove', handlePointerMove);
+        documentTarget.removeEventListener('pointerdown', handlePointerDown);
+        documentTarget.removeEventListener('pointerup', handlePointerUp);
         documentTarget.removeEventListener('keydown', handleKeyDown);
         documentTarget.removeEventListener('keyup', handleKeyUp);
         documentTarget.removeEventListener('wheel', handleWheel);
@@ -172,8 +239,20 @@ export class LiveInteractionCollectingService {
     }
 
     if (windowTarget !== undefined) {
-      const handleBlur = () => this.emit(config, 'page_hidden', { source: 'window_blur' });
-      const handleFocus = () => this.emit(config, 'page_visible', { source: 'window_focus' });
+      const handleBlur = () => this.emitPageVisibilityTransition(
+        config,
+        pageVisibilityState,
+        target,
+        'page_hidden',
+        'window_blur',
+      );
+      const handleFocus = () => this.emitPageVisibilityTransition(
+        config,
+        pageVisibilityState,
+        target,
+        'page_visible',
+        'window_focus',
+      );
       windowTarget.addEventListener('blur', handleBlur);
       windowTarget.addEventListener('focus', handleFocus);
       uninstallers.push(() => {
@@ -209,8 +288,63 @@ export class LiveInteractionCollectingService {
     };
   }
 
+  private emitPageVisibilityTransition(
+    config: LiveInteractionCollectingConfigEntity,
+    state: PageVisibilityPatternCollectingState,
+    target: LiveInteractionTargetEntity,
+    kind: 'page_hidden' | 'page_visible',
+    source: string,
+  ): void {
+    const atMs = this.now(config);
+    const metadata = kind === 'page_hidden'
+      ? this.pageVisibilityPatternCollectingService.collectExitMetadata(state, atMs, { target, source })
+      : this.pageVisibilityPatternCollectingService.collectReturnMetadata(state, atMs, { target, source });
+    this.emit(config, kind, metadata);
+  }
+
+  private emitPageVisibilityAction(
+    config: LiveInteractionCollectingConfigEntity,
+    state: PageVisibilityPatternCollectingState,
+    target: LiveInteractionTargetEntity,
+    kind: Parameters<LiveInteractionCollectingConfigEntity['onEvent']>[0]['kind'] | 'confirm_click' | 'input' | 'keydown',
+    eventTarget: unknown,
+    atMs: number,
+  ): void {
+    const actionKind = kind === 'recipient_pasted' ||
+      kind === 'amount_pasted' ||
+      kind === 'confirm_click' ||
+      kind === 'keydown'
+      ? kind
+      : 'input';
+    const metadata = this.pageVisibilityPatternCollectingService.collectActionMetadata(
+      state,
+      actionKind,
+      atMs,
+      {
+        target,
+        source: this.fieldInputCollectingService.targetText(eventTarget),
+      },
+    );
+    if (metadata === null) return;
+    this.emit(config, 'page_visibility_observed', metadata);
+  }
+
+  private recordPaymentFormActivity(
+    state: PageVisibilityPatternCollectingState,
+    target: unknown,
+    atMs: number,
+  ): void {
+    if (!this.pageVisibilityPatternCollectingService.isPaymentFormTarget(
+      this.fieldInputCollectingService.targetText(target),
+    )) return;
+    this.pageVisibilityPatternCollectingService.recordPaymentFormActivity(state, atMs);
+  }
+
   private scanDocumentText(config: LiveInteractionCollectingConfigEntity, target: LiveInteractionTargetEntity): void {
-    const text = target.document?.body?.innerText ?? target.document?.body?.textContent ?? '';
+    const text = [
+      target.document?.body?.innerText ?? target.document?.body?.textContent ?? '',
+      ...this.anchorTexts(target),
+    ].join(' ');
     this.scanText(config, text, 'dom');
   }
 
@@ -231,45 +365,53 @@ export class LiveInteractionCollectingService {
         textLength: text.length,
       });
     }
+    this.phishingUrlPatternMatchingService.extractUrls(text).forEach((url) => {
+      const metadata = {
+        source,
+        url,
+        contextText: text,
+        textLength: text.length,
+      };
+      const reasonCodes = this.phishingUrlPatternMatchingService.match(url, metadata);
+      if (reasonCodes.length === 0) return;
+      this.emit(config, 'phishing_url_observed', {
+        ...metadata,
+        reason: reasonCodes[0],
+        reasonCodes,
+      });
+    });
   }
 
-  private targetText(target: unknown): string {
-    if (target === null || typeof target !== 'object') return '';
-    const record = target as Record<string, unknown>;
-    return [
-      this.targetDescriptor(target),
-      record.value,
-    ]
-      .filter((value): value is string => typeof value === 'string')
-      .join(' ');
+  private anchorTexts(target: LiveInteractionTargetEntity): string[] {
+    return this.anchorCandidates(target)
+      .map((anchor) => {
+        if (anchor === null || typeof anchor !== 'object') return '';
+        const record = anchor as Record<string, unknown>;
+        return [record.href, record.textContent]
+          .filter((value): value is string => typeof value === 'string')
+          .join(' ');
+      })
+      .filter((value) => value.trim() !== '');
+  }
+
+  private anchorCandidates(target: LiveInteractionTargetEntity): unknown[] {
+    const documentAnchors = this.arrayLikeToArray(target.document?.querySelectorAll?.('a[href]'));
+    const bodyAnchors = this.arrayLikeToArray(target.document?.body?.querySelectorAll?.('a[href]'));
+    return [...documentAnchors, ...bodyAnchors];
+  }
+
+  private arrayLikeToArray(value: ArrayLike<unknown> | undefined): unknown[] {
+    if (value === undefined) return [];
+    return Array.from({ length: value.length }, (_item, index) => value[index]);
   }
 
   private targetDescriptor(target: unknown): string {
-    if (target === null || typeof target !== 'object') return '';
-    const record = target as Record<string, unknown>;
-    return [
-      record.name,
-      record.type,
-      record.id,
-      record.placeholder,
-      record.ariaLabel,
-      record.textContent,
-    ]
-      .filter((value): value is string => typeof value === 'string')
-      .join(' ');
+    return this.fieldInputCollectingService.targetDescriptor(target);
   }
 
   private looksLikeRecipient(text: string): boolean {
     const compact = text.replace(/\s+/g, '');
     return /^\+?\d{10,20}$/.test(compact) || /^[A-Z]{2}\d{12,32}$/i.test(compact);
-  }
-
-  private isAmountPaste(target: unknown, targetText: string, pastedText: string): boolean {
-    if (!this.looksLikeAmount(pastedText)) return false;
-    if (AMOUNT_FIELD_PATTERN.test(targetText)) return true;
-    if (target === null || typeof target !== 'object') return false;
-    const type = (target as Record<string, unknown>).type;
-    return type === 'number' && !RECIPIENT_FIELD_PATTERN.test(targetText);
   }
 
   private looksLikeAmount(text: string): boolean {
@@ -281,135 +423,10 @@ export class LiveInteractionCollectingService {
     return /^[+-]?\d{1,9}([.,]\d{1,2})?$/.test(normalized);
   }
 
-  private recordRecipientPaste(
-    inputStates: WeakMap<object, FieldInputTrackingState>,
-    target: unknown,
-    pastedText: string,
-  ): void {
-    const state = this.fieldState(inputStates, target);
-    if (state === undefined) return;
-    state.lastRecipientPasteValue = pastedText;
-  }
-
-  private recordAmountPaste(
-    inputStates: WeakMap<object, FieldInputTrackingState>,
-    target: unknown,
-    pastedText: string,
-  ): void {
-    const state = this.fieldState(inputStates, target);
-    if (state === undefined) return;
-    state.lastAmountPasteValue = pastedText;
-  }
-
-  private recordTypedKey(
-    inputStates: WeakMap<object, FieldInputTrackingState>,
-    target: unknown,
-    key: string | undefined,
-  ): FieldInputTrackingState | undefined {
-    if (!this.isTextInputKey(key)) return undefined;
-    const state = this.fieldState(inputStates, target);
-    if (state === undefined) return undefined;
-    state.keyCount += 1;
-    return state;
-  }
-
-  private detectRecipientFilledWithoutTyping(
-    config: LiveInteractionCollectingConfigEntity,
-    inputStates: WeakMap<object, FieldInputTrackingState>,
-    recipientBulkFillTrackingState: RecipientBulkFillTrackingState,
-    target: unknown,
-  ): void {
-    const state = this.fieldState(inputStates, target);
-    if (state === undefined) return;
-
-    const targetText = this.targetDescriptor(target);
-    const targetValue = this.targetValue(target);
-    if (!this.isRecipientTarget(targetText, targetValue)) return;
-
-    const previousValue = state.previousValue;
-    state.previousValue = targetValue;
-    if (targetValue === '' || targetValue === state.lastRecipientPasteValue) return;
-
-    const grewBy = targetValue.length - previousValue.length;
-    const wasFilledWithoutTyping = state.keyCount === 0 && targetValue.length >= 3;
-    const wasBulkFilled = grewBy >= 6;
-    if (!wasFilledWithoutTyping && !wasBulkFilled) return;
-
-    this.emit(config, 'recipient_pasted', {
-      targetText: this.targetDescriptor(target),
-      pastedLength: targetValue.length,
-      reason: wasFilledWithoutTyping ? 'filled_without_typing' : 'bulk_input_jump',
-    });
-    this.recordRecipientBulkFill(config, recipientBulkFillTrackingState, target);
-    state.lastRecipientPasteValue = targetValue;
-  }
-
-  private detectAmountFilledWithoutTyping(
-    config: LiveInteractionCollectingConfigEntity,
-    inputStates: WeakMap<object, FieldInputTrackingState>,
-    target: unknown,
-  ): void {
-    const state = this.fieldState(inputStates, target);
-    if (state === undefined) return;
-
-    const targetValue = this.targetValue(target);
-    const targetDescriptor = this.targetDescriptor(target);
-    if (!this.isAmountTarget(target, targetDescriptor, targetValue)) return;
-
-    const previousValue = state.previousValue;
-    state.previousValue = targetValue;
-    if (targetValue === '' || targetValue === state.lastAmountPasteValue) return;
-
-    const grewBy = targetValue.length - previousValue.length;
-    const wasFilledWithoutTyping = state.keyCount === 0 && targetValue.length >= 2;
-    const wasBulkFilled = grewBy >= 4;
-    if (!wasFilledWithoutTyping && !wasBulkFilled) return;
-
-    this.emit(config, 'amount_pasted', {
-      targetText: targetDescriptor,
-      pastedLength: targetValue.length,
-      reason: wasFilledWithoutTyping ? 'filled_without_typing' : 'bulk_input_jump',
-    });
-    state.lastAmountPasteValue = targetValue;
-  }
-
   private isRecipientTarget(targetText: string, targetValue: string): boolean {
-    return RECIPIENT_FIELD_PATTERN.test(targetText)
-      || RECIPIENT_BULK_FIELD_PATTERN.test(targetText)
-      || this.looksLikeRecipient(targetValue);
-  }
-
-  private recordRecipientBulkFill(
-    config: LiveInteractionCollectingConfigEntity,
-    recipientBulkFillTrackingState: RecipientBulkFillTrackingState,
-    target: unknown,
-  ): void {
-    const fieldKey = this.targetDescriptor(target);
-    if (fieldKey === '') return;
-
-    const atMs = this.now(config);
-    const records = recipientBulkFillTrackingState.records
-      .filter((record) => atMs - record.atMs <= RECIPIENT_BULK_FILL_WINDOW_MS)
-      .filter((record) => record.fieldKey !== fieldKey);
-
-    records.push({ fieldKey, atMs });
-    recipientBulkFillTrackingState.records = records;
-
-    if (records.length < RECIPIENT_BULK_FILL_MINIMUM_FIELDS) return;
-    this.emit(config, 'form_fill_order_observed', {
-      reason: 'multi_field_recipient_bulk_fill',
-      fieldCount: records.length,
-      windowMs: RECIPIENT_BULK_FILL_WINDOW_MS,
-    });
-    recipientBulkFillTrackingState.records = [];
-  }
-
-  private isAmountTarget(target: unknown, targetDescriptor: string, targetValue: string): boolean {
-    if (!this.looksLikeAmount(targetValue)) return false;
-    if (AMOUNT_FIELD_PATTERN.test(targetDescriptor)) return true;
-    if (target === null || typeof target !== 'object') return false;
-    const type = (target as Record<string, unknown>).type;
-    return type === 'number' && !RECIPIENT_FIELD_PATTERN.test(targetDescriptor);
+    return RECIPIENT_FIELD_PATTERN.test(targetText) ||
+      RECIPIENT_BULK_FIELD_PATTERN.test(targetText) ||
+      this.looksLikeRecipient(targetValue);
   }
 
   private targetValue(target: unknown): string {
@@ -420,29 +437,29 @@ export class LiveInteractionCollectingService {
     return '';
   }
 
-  private fieldState(
-    inputStates: WeakMap<object, FieldInputTrackingState>,
-    target: unknown,
-  ): FieldInputTrackingState | undefined {
-    if (target === null || typeof target !== 'object') return undefined;
-    const existingState = inputStates.get(target);
-    if (existingState !== undefined) return existingState;
-    const nextState = {
-      keyCount: 0,
-      previousValue: this.targetValue(target),
-    };
-    inputStates.set(target, nextState);
-    return nextState;
-  }
-
-  private isTextInputKey(key: string | undefined): boolean {
-    return key === undefined || key.length === 1 || key === 'Backspace' || key === 'Delete';
-  }
-
   private isCorrectionExpectedTarget(target: unknown): boolean {
     const targetValue = this.targetValue(target);
     if (!/[A-Za-zА-Яа-я]/.test(targetValue)) return false;
     return this.isRecipientTarget(this.targetDescriptor(target), targetValue);
+  }
+
+  private emitPointerVerdict(
+    config: LiveInteractionCollectingConfigEntity,
+    verdict: PointerPatternVerdictEntity | null,
+  ): void {
+    if (verdict === null) return;
+    this.emit(config, 'pointer_anomaly_observed', {
+      reason: verdict.reasonCode,
+      reasonCodes: verdict.reasonCodes,
+      verdict: verdict.level,
+      confidence: verdict.confidence,
+      ...verdict.metadata,
+    });
+  }
+
+  private formRequiresReadingTarget(target: unknown): boolean {
+    return /(terms|warning|disclosure|agreement|notice|consent|read|review|услов|предупрежд|соглас)/i
+      .test(this.fieldInputCollectingService.targetText(target));
   }
 
   private emit(

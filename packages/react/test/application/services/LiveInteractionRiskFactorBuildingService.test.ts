@@ -14,7 +14,9 @@ describe('LiveInteractionRiskFactorBuildingService', () => {
         event('warning_confirmed', 900),
         event('form_fill_order_observed', 950),
         event('page_hidden', 1000),
-        event('page_visible', 1100),
+        event('page_visible', 1100, {
+          reason: 'frequent_page_exits_during_payment_form',
+        }),
         event('pointer_anomaly_observed', 1200),
         event('rapid_scroll_observed', 1250),
         event('keystroke_anomaly_observed', 1300),
@@ -30,7 +32,8 @@ describe('LiveInteractionRiskFactorBuildingService', () => {
       ['form_fill_order', 20, 'multi_field_recipient_bulk_fill'],
       ['warning_dwell', 18, 'warning_dwell_too_short'],
       ['composite_risk_boost', 42, 'warning_skip_step_up_floor'],
-      ['page_visibility', 20, 'page_visibility_oscillation'],
+      ['page_visibility', 25, 'frequent_page_exits_during_payment_form'],
+      ['composite_risk_boost', 35, 'frequent_page_exits_during_payment_form'],
       ['pointer_pattern', 16, 'pointer_pattern_anomaly'],
       ['keystroke_dynamics', 24, 'keystroke_dynamics_anomaly'],
       ['phishing_text_dom', 60, 'phishing_text_dom'],
@@ -51,6 +54,56 @@ describe('LiveInteractionRiskFactorBuildingService', () => {
         event('page_hidden', 1100),
       ]),
     ).toEqual([]);
+  });
+
+  it('does not emit page visibility factors for allow page visibility patterns', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(
+      service.build([
+        event('page_hidden', 100),
+        event('page_visible', 2100, {
+          reason: 'single_short_push_notification_blur',
+        }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it('maps mobile notification blur patterns to monitor-strength page visibility', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(
+      service.build([
+        event('page_visibility_observed', 100, {
+          reason: 'mobile_notification_blur_monitor',
+          mobileContext: true,
+        }),
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        kind: 'page_visibility',
+        contribution: 20,
+        reasonCodes: ['mobile_notification_blur_monitor'],
+        metadata: expect.objectContaining({
+          mobileContext: true,
+        }),
+      }),
+    ]);
+  });
+
+  it('maps blocking page visibility patterns with a block floor boost', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(
+      service.build([
+        event('page_visibility_observed', 100, {
+          reason: 'return_paste_iban_after_exit',
+        }),
+      ]).map((factor) => [factor.kind, factor.contribution, factor.reasonCodes?.[0]]),
+    ).toEqual([
+      ['page_visibility', 25, 'return_paste_iban_after_exit'],
+      ['composite_risk_boost', 60, 'return_paste_iban_after_exit'],
+    ]);
   });
 
   it('maps three fast warning confirmations to a blocking warning series boost', () => {
@@ -90,6 +143,51 @@ describe('LiveInteractionRiskFactorBuildingService', () => {
           reasonCodes: ['click_burst_pattern'],
         }),
       ]);
+  });
+
+  it('maps step-up pointer reasons to pointer pattern with a boost', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(
+      service.build([
+        event('pointer_anomaly_observed', 100, {
+          reason: 'pointer_constant_speed_automation',
+        }),
+      ]).map((factor) => [factor.kind, factor.contribution, factor.reasonCodes?.[0]]),
+    ).toEqual([
+      ['pointer_pattern', 20, 'pointer_constant_speed_automation'],
+      ['composite_risk_boost', 40, 'pointer_step_up_floor'],
+    ]);
+  });
+
+  it('maps monitor pointer reasons without a boost', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(
+      service.build([
+        event('pointer_anomaly_observed', 100, {
+          reason: 'pointer_tremor_false_positive_risk',
+        }),
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        kind: 'pointer_pattern',
+        contribution: 20,
+        reasonCodes: ['pointer_tremor_false_positive_risk'],
+      }),
+    ]);
+  });
+
+  it('does not emit risk factors for allow pointer reasons', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(
+      service.build([
+        event('pointer_anomaly_observed', 100, {
+          reason: 'pointer_touch_only_not_applicable',
+        }),
+      ]),
+    ).toEqual([]);
   });
 
   it('maps step-up keystroke reasons to keystroke dynamics with a boost', () => {
@@ -144,10 +242,126 @@ describe('LiveInteractionRiskFactorBuildingService', () => {
     { reason: 'local_baseline_scaled_manhattan_match', scaledManhattanDistance: 0.12, threshold: 0.75 },
     { cadenceRatio: 1.6, reason: 'local_baseline_slow_cadence_match' },
     { cadenceRatio: 0.6, reason: 'local_baseline_fast_cadence_match' },
+    { reason: 'voice_to_text_no_keystroke_factor', inputMethod: 'voice_to_text' },
   ])('does not emit risk factors for allow keystroke verdicts', (metadata) => {
     const service = new LiveInteractionRiskFactorBuildingService();
 
     expect(service.build([event('keystroke_anomaly_observed', 100, metadata)])).toEqual([]);
+  });
+
+  it('does not emit risk factors for KST-17 voice-to-text events without keystrokes', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(
+      service.build([
+        event('voice_to_text_no_keystroke_factor', 100, {
+          inputMethod: 'voice_to_text',
+        }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it('keeps copy-paste manual key metadata for composite scoring', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(
+      service.build([
+        event('amount_pasted', 100, {
+          manualKeyCount: 0,
+          keyCount: 0,
+        }),
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        kind: 'copy_paste_amount',
+        reasonCodes: ['copy_paste_amount'],
+        metadata: {
+          manualKeyCount: 0,
+          keyCount: 0,
+          eventCount: 1,
+          observations: [
+            {
+              manualKeyCount: 0,
+              keyCount: 0,
+            },
+          ],
+        },
+      }),
+    ]);
+  });
+
+  it('maps first-time device metadata into device fingerprint factors', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(
+      service.build([
+        event('device_fingerprint_observed', 100, {
+          reason: 'first_time_device',
+          firstSeenDevice: true,
+        }),
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        kind: 'device_fingerprint',
+        contribution: 30,
+        reasonCodes: ['first_time_device'],
+        metadata: {
+          reason: 'first_time_device',
+          firstSeenDevice: true,
+          eventCount: 1,
+          observations: [
+            {
+              reason: 'first_time_device',
+              firstSeenDevice: true,
+            },
+          ],
+        },
+      }),
+    ]);
+  });
+
+  it('maps phishing URL observations through the core URL signal builder', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(
+      service.build([
+        event('phishing_url_observed', 100, {
+          source: 'clipboard',
+          url: 'https://gosuslugi-confirm.com',
+          reason: 'phishing_url_clipboard_gosuslugi_typosquat',
+        }),
+      ]).map((factor) => [factor.kind, factor.contribution, factor.reasonCodes?.[0], factor.metadata?.source]),
+    ).toEqual([
+      ['phishing_url', 40, 'phishing_url_clipboard_gosuslugi_typosquat', 'clipboard'],
+      ['composite_risk_boost', 20, 'phishing_url_step_up_floor', 'clipboard'],
+    ]);
+  });
+
+  it('does not map allowlisted phishing URL observations into risk factors', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(
+      service.build([
+        event('phishing_url_observed', 100, {
+          url: 'https://sberbank.ru/online',
+        }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it('keeps shortener URL observations at monitor strength', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(
+      service.build([
+        event('phishing_url_observed', 100, {
+          url: 'https://bit.ly/unknown',
+        }),
+      ]).map((factor) => [factor.kind, factor.contribution, factor.reasonCodes?.[0]]),
+    ).toEqual([
+      ['phishing_url', 25, 'phishing_url_shortener_needs_expansion'],
+      ['composite_risk_boost', 5, 'phishing_url_monitor_floor'],
+    ]);
   });
 
   it.each([
@@ -169,6 +383,63 @@ describe('LiveInteractionRiskFactorBuildingService', () => {
         contribution: 30,
         reasonCodes: [reason],
       }),
+    ]);
+  });
+
+  it('maps DevTools activity to a step-up floor', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(
+      service.build([
+        event('dev_environment_observed', 100, {
+          reason: 'devtools_console_long_js_paste',
+        }),
+      ]).map((factor) => [factor.kind, factor.contribution, factor.reasonCodes?.[0]]),
+    ).toEqual([
+      ['dev_environment', 15, 'devtools_console_long_js_paste'],
+      ['composite_risk_boost', 45, 'devtools_step_up_floor'],
+    ]);
+  });
+
+  it('maps webdriver DevTools evidence to a blocking bot floor', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(
+      service.build([
+        event('dev_environment_observed', 100, {
+          reason: 'webdriver_enabled',
+        }),
+      ]).map((factor) => [factor.kind, factor.contribution, factor.reasonCodes?.[0]]),
+    ).toEqual([
+      ['bot_detection', 50, 'webdriver_enabled'],
+      ['composite_risk_boost', 35, 'devtools_bot_block_floor'],
+    ]);
+  });
+
+  it.each([
+    { reason: 'devtools_allowed_work_account' },
+    { reason: 'devtools_not_opened_session' },
+    { reason: 'devtools_post_transaction_open' },
+    { reason: 'devtools_neighbor_developer_site' },
+  ])('does not emit risk factors for allow DevTools verdicts', (metadata) => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(service.build([event('dev_environment_observed', 100, metadata)])).toEqual([]);
+  });
+
+  it('maps short DevTools HTML inspection to monitor strength', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(
+      service.build([
+        event('dev_environment_observed', 100, {
+          durationMs: 5000,
+          reason: 'devtools_short_html_inspection',
+        }),
+      ]).map((factor) => [factor.kind, factor.contribution, factor.reasonCodes?.[0]]),
+    ).toEqual([
+      ['dev_environment', 15, 'devtools_short_html_inspection'],
+      ['composite_risk_boost', 15, 'devtools_monitor_floor'],
     ]);
   });
 

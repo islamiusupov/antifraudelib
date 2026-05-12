@@ -1,5 +1,9 @@
 import {
+  DevEnvironmentSignalBuildingService,
   KeystrokeDynamicsSignalBuildingService,
+  PageVisibilitySignalBuildingService,
+  PhishingUrlSignalBuildingService,
+  PointerPatternSignalBuildingService,
   WarningDwellSignalBuildingService,
   type RiskSignalEntity,
   type WarningDwellObservationEntity,
@@ -17,6 +21,10 @@ export class DBankLiveFactorExtractingService {
   constructor(
     private readonly warningDwellSignalBuildingService = new WarningDwellSignalBuildingService(),
     private readonly keystrokeDynamicsSignalBuildingService = new KeystrokeDynamicsSignalBuildingService(),
+    private readonly devEnvironmentSignalBuildingService = new DevEnvironmentSignalBuildingService(),
+    private readonly pointerPatternSignalBuildingService = new PointerPatternSignalBuildingService(),
+    private readonly phishingUrlSignalBuildingService = new PhishingUrlSignalBuildingService(),
+    private readonly pageVisibilitySignalBuildingService = new PageVisibilitySignalBuildingService(),
   ) {}
 
   extract(events: DBankObservedEventEntity[]): RiskSignalEntity[] {
@@ -25,6 +33,7 @@ export class DBankLiveFactorExtractingService {
     const smallTestPaymentEvent = this.findSmallTestPaymentEvent(events);
     const hasSmallTestPaymentPattern = smallTestPaymentEvent !== undefined;
 
+    const recipientPasteMetadata = this.optionalEventMetadata(events, 'recipient_pasted');
     if (this.hasEvent(events, 'recipient_pasted')) {
       signals.push({
         kind: 'copy_paste_recipient',
@@ -32,8 +41,10 @@ export class DBankLiveFactorExtractingService {
         confidence: 1,
         reasonCodes: ['copy_paste_recipient'],
         source: 'live',
+        ...(recipientPasteMetadata !== undefined ? { metadata: recipientPasteMetadata } : {}),
       });
     }
+    const amountPasteMetadata = this.optionalEventMetadata(events, 'amount_pasted');
     if (this.hasEvent(events, 'amount_pasted')) {
       signals.push({
         kind: 'copy_paste_amount',
@@ -41,6 +52,7 @@ export class DBankLiveFactorExtractingService {
         confidence: 1,
         reasonCodes: ['copy_paste_amount'],
         source: 'live',
+        ...(amountPasteMetadata !== undefined ? { metadata: amountPasteMetadata } : {}),
       });
     }
     const recipientCreatedEvent = events.find((event) => event.kind === 'recipient_created');
@@ -90,15 +102,10 @@ export class DBankLiveFactorExtractingService {
         source: 'live',
       });
     }
-    if (this.hasEvent(events, 'page_hidden') && this.hasEvent(events, 'page_visible')) {
-      signals.push({
-        kind: 'page_visibility',
-        detected: true,
-        confidence: 0.8,
-        reasonCodes: ['page_visibility_oscillation'],
-        source: 'live',
-      });
-    }
+    signals.push(...this.pageVisibilitySignalBuildingService.build(
+      this.pageVisibilityReasonCodes(events),
+      this.pageVisibilityMetadata(events),
+    ));
     if (this.hasEvent(events, 'visual_challenge_started')) {
       signals.push({
         kind: 'visual_challenge',
@@ -112,31 +119,18 @@ export class DBankLiveFactorExtractingService {
       this.eventReasonCodes(events, 'keystroke_anomaly_observed', 'keystroke_dynamics_anomaly'),
       this.eventMetadata(events, 'keystroke_anomaly_observed'),
     ));
-    if (this.hasEvent(events, 'pointer_anomaly_observed')) {
+    signals.push(...this.pointerPatternSignalBuildingService.build(
+      this.pointerReasonCodes(events),
+      this.pointerMetadata(events),
+    ));
+    if (this.hasEvent(events, 'screen_sharing_observed')) {
       signals.push({
-        kind: 'pointer_pattern',
-        detected: true,
-        confidence: 0.8,
-        reasonCodes: ['pointer_pattern_anomaly'],
-        source: 'paper',
-      });
-    }
-    if (this.hasEvent(events, 'rapid_scroll_observed')) {
-      signals.push({
-        kind: 'pointer_pattern',
-        detected: true,
-        confidence: 0.8,
-        reasonCodes: ['rapid_scroll_pattern'],
-        source: 'paper',
-      });
-    }
-    if (this.hasEvent(events, 'click_burst_observed')) {
-      signals.push({
-        kind: 'pointer_pattern',
+        kind: 'screen_sharing',
         detected: true,
         confidence: 1,
-        reasonCodes: ['click_burst_pattern'],
+        reasonCodes: this.eventReasonCodes(events, 'screen_sharing_observed', 'screen_sharing_heuristic'),
         source: 'live',
+        ...this.eventMetadataProperty(events, 'screen_sharing_observed'),
       });
     }
     if (this.hasEvent(events, 'native_tampering_observed')) {
@@ -148,15 +142,10 @@ export class DBankLiveFactorExtractingService {
         source: 'live',
       });
     }
-    if (this.hasEvent(events, 'dev_environment_observed')) {
-      signals.push({
-        kind: 'dev_environment',
-        detected: true,
-        confidence: 1,
-        reasonCodes: ['dev_environment'],
-        source: 'live',
-      });
-    }
+    signals.push(...this.devEnvironmentSignalBuildingService.build(
+      this.eventReasonCodes(events, 'dev_environment_observed', 'dev_environment'),
+      this.eventMetadata(events, 'dev_environment_observed'),
+    ));
     if (this.hasEvent(events, 'bot_detected')) {
       signals.push({
         kind: 'bot_detection',
@@ -175,15 +164,10 @@ export class DBankLiveFactorExtractingService {
         source: 'live',
       });
     }
-    if (this.hasEvent(events, 'phishing_url_observed')) {
-      signals.push({
-        kind: 'phishing_url',
-        detected: true,
-        confidence: 1,
-        reasonCodes: ['phishing_url_pattern'],
-        source: 'live',
-      });
-    }
+    signals.push(...this.phishingUrlSignalBuildingService.build(
+      this.eventReasonCodes(events, 'phishing_url_observed', 'phishing_url_pattern'),
+      this.eventMetadata(events, 'phishing_url_observed'),
+    ));
     if (this.hasEvent(events, 'token_injection_observed')) {
       signals.push({
         kind: 'recent_token_injection',
@@ -216,8 +200,9 @@ export class DBankLiveFactorExtractingService {
         kind: 'device_fingerprint',
         detected: true,
         confidence: 1,
-        reasonCodes: ['device_fingerprint'],
+        reasonCodes: this.eventReasonCodes(events, 'device_fingerprint_observed', 'device_fingerprint'),
         source: 'server',
+        ...this.eventMetadataProperty(events, 'device_fingerprint_observed'),
       });
     }
     events
@@ -400,6 +385,79 @@ export class DBankLiveFactorExtractingService {
       eventCount: this.countEvents(events, kind),
       observations,
     };
+  }
+
+  private pageVisibilityReasonCodes(events: DBankObservedEventEntity[]): string[] {
+    return this.pageVisibilityEvents(events)
+      .reduce<string[]>((reasonCodes, event) => [
+        ...reasonCodes,
+        ...this.metadataReasonCodes(event.metadata, ''),
+      ], []);
+  }
+
+  private pageVisibilityMetadata(events: DBankObservedEventEntity[]): Record<string, unknown> {
+    const pageVisibilityEvents = this.pageVisibilityEvents(events);
+    const observations = pageVisibilityEvents
+      .filter((event) => this.isMetadataRecord(event.metadata))
+      .map((event) => event.metadata as Record<string, unknown>);
+    const latestMetadata = observations.length > 0 ? observations[observations.length - 1] : {};
+    return {
+      ...latestMetadata,
+      eventCount: pageVisibilityEvents.length,
+      hiddenCount: this.countEvents(events, 'page_hidden'),
+      visibleCount: this.countEvents(events, 'page_visible'),
+      observedCount: this.countEvents(events, 'page_visibility_observed'),
+      observations,
+    };
+  }
+
+  private pageVisibilityEvents(events: DBankObservedEventEntity[]): DBankObservedEventEntity[] {
+    return events.filter((event) => (
+      event.kind === 'page_hidden' ||
+      event.kind === 'page_visible' ||
+      event.kind === 'page_visibility_observed'
+    ));
+  }
+
+  private pointerReasonCodes(events: DBankObservedEventEntity[]): string[] {
+    return [
+      ...this.eventReasonCodes(events, 'pointer_anomaly_observed', 'pointer_pattern_anomaly'),
+      ...this.eventReasonCodes(events, 'rapid_scroll_observed', 'rapid_scroll_pattern'),
+      ...this.eventReasonCodes(events, 'click_burst_observed', 'click_burst_pattern'),
+    ];
+  }
+
+  private pointerMetadata(events: DBankObservedEventEntity[]): Record<string, unknown> {
+    const pointerEvents = events.filter((event) => (
+      event.kind === 'pointer_anomaly_observed' ||
+      event.kind === 'rapid_scroll_observed' ||
+      event.kind === 'click_burst_observed'
+    ));
+    const observations = pointerEvents
+      .filter((event) => this.isMetadataRecord(event.metadata))
+      .map((event) => event.metadata as Record<string, unknown>);
+    const latestMetadata = observations.length > 0 ? observations[observations.length - 1] : {};
+    return {
+      ...latestMetadata,
+      eventCount: pointerEvents.length,
+      observations,
+    };
+  }
+
+  private optionalEventMetadata(
+    events: DBankObservedEventEntity[],
+    kind: DBankObservedEventEntity['kind'],
+  ): Record<string, unknown> | undefined {
+    if (!events.some((event) => event.kind === kind && this.isMetadataRecord(event.metadata))) return undefined;
+    return this.eventMetadata(events, kind);
+  }
+
+  private eventMetadataProperty(
+    events: DBankObservedEventEntity[],
+    kind: DBankObservedEventEntity['kind'],
+  ): { metadata?: Record<string, unknown> } {
+    const metadata = this.optionalEventMetadata(events, kind);
+    return metadata !== undefined ? { metadata } : {};
   }
 
   private metadataReasonCodes(metadata: DBankObservedEventEntity['metadata'], fallback: string): string[] {

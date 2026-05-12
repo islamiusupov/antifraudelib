@@ -31,6 +31,7 @@ export const RISK_FACTOR_DEFINITIONS: FactorDefinitionEntity[] = [
   { kind: 'client_clock_skew', maxContribution: 20, source: 'paper', tier: 'PAPER' },
   { kind: 'bot_detection', maxContribution: 50, source: 'live', tier: 'LIVE' },
   { kind: 'concurrent_media', maxContribution: 35, source: 'live', tier: 'LIVE' },
+  { kind: 'screen_sharing', maxContribution: 35, source: 'live', tier: 'LIVE' },
   { kind: 'parallel_session', maxContribution: 40, source: 'server', tier: 'MOCK' },
   { kind: 'new_recipient', maxContribution: 25, source: 'server', tier: 'MOCK' },
   { kind: 'amount_anomaly', maxContribution: 30, source: 'server', tier: 'MOCK' },

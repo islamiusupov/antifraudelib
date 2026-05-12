@@ -42,13 +42,31 @@ body {
 
 .deepfraud-risk-meter {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
   border: 1px solid #dbe2ea;
   border-radius: 8px;
   background: #ffffff;
+  --deepfraud-risk-accent: #178263;
+  --deepfraud-risk-area: rgba(23, 130, 99, 0.14);
   padding: 14px;
+}
+
+.deepfraud-risk-meter[data-decision="step_up"] {
+  --deepfraud-risk-accent: #bb7a10;
+  --deepfraud-risk-area: rgba(187, 122, 16, 0.16);
+}
+
+.deepfraud-risk-meter[data-decision="block"] {
+  --deepfraud-risk-accent: #b42318;
+  --deepfraud-risk-area: rgba(180, 35, 24, 0.14);
+}
+
+.deepfraud-risk-meter__summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
 }
 
 .deepfraud-risk-meter__track {
@@ -61,16 +79,8 @@ body {
 .deepfraud-risk-meter__fill {
   height: 100%;
   border-radius: inherit;
-  background: #178263;
+  background: var(--deepfraud-risk-accent);
   transition: width 180ms ease;
-}
-
-.deepfraud-risk-meter[data-decision="step_up"] .deepfraud-risk-meter__fill {
-  background: #bb7a10;
-}
-
-.deepfraud-risk-meter[data-decision="block"] .deepfraud-risk-meter__fill {
-  background: #b42318;
 }
 
 .deepfraud-risk-meter__score {
@@ -78,6 +88,74 @@ body {
   text-align: right;
   font-size: 24px;
   line-height: 1;
+}
+
+.deepfraud-risk-meter__history {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.deepfraud-risk-meter__chart {
+  display: block;
+  width: 100%;
+  height: 86px;
+  overflow: visible;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background:
+    linear-gradient(to bottom, rgba(32, 36, 42, 0.05) 1px, transparent 1px) 0 0 / 100% 24px,
+    linear-gradient(to right, rgba(32, 36, 42, 0.04) 1px, transparent 1px) 0 0 / 25% 100%,
+    #fbfcfd;
+}
+
+.deepfraud-risk-meter__chart-area {
+  fill: var(--deepfraud-risk-area);
+}
+
+.deepfraud-risk-meter__chart-line {
+  fill: none;
+  stroke: var(--deepfraud-risk-accent);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.deepfraud-risk-meter__chart-point {
+  fill: #ffffff;
+  stroke: var(--deepfraud-risk-accent);
+  stroke-width: 2;
+}
+
+.deepfraud-risk-meter__axis {
+  display: flex;
+  justify-content: space-between;
+  color: #667085;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.deepfraud-activity-export {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.deepfraud-activity-export button {
+  min-height: 36px;
+  border: 1px solid #cfd8e3;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #20242a;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.deepfraud-activity-export button:hover {
+  border-color: #98a6b7;
+  background: #f3f6f9;
 }
 
 .deepfraud-decision-badge {

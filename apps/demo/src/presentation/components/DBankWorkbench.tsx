@@ -19,6 +19,7 @@ import {
 } from '@deepcode/antifraud-react';
 import { DBankEventRiskFactorsBuildingService } from '../../application/services/DBankEventRiskFactorsBuildingService';
 import type { DemoWorkbenchConfigEntity } from '../../domain/demo/entities/DemoWorkbenchConfigEntity';
+import { ActivityExportPanel } from './ActivityExportPanel';
 
 const DEMO_SIGNAL_TTL_MS = 30000;
 
@@ -156,6 +157,13 @@ export function DBankWorkbench({ config }: DBankWorkbenchProps) {
         </section>
         <aside className="deepfraud-demo-workbench__result" data-dbank-event-count={activeObservedEvents.length}>
           <RiskMeter />
+          <ActivityExportPanel
+            observedEvents={observedEvents}
+            iframeLiveEvents={iframeLiveEvents}
+            iframeBrowserApiEvents={iframeBrowserApiEvents}
+            clockMs={clockMs}
+            windowMs={DEMO_SIGNAL_TTL_MS}
+          />
           <DecisionBadge />
           <VisualChallengeGate autoRequest includeAudio />
           <RiskFactorList />

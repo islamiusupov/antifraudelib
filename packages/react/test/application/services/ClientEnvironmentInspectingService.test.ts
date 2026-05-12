@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ClientEnvironmentInspectingService } from '../../../src/application/services/ClientEnvironmentInspectingService';
 
 describe('ClientEnvironmentInspectingService', () => {
-  it('reports webdriver, electron, devtools hook, and native tampering signals', () => {
+  it('reports detailed webdriver, PhantomJS, devtools hook, and native tampering signals', () => {
     const service = new ClientEnvironmentInspectingService();
 
     expect(
@@ -17,10 +17,40 @@ describe('ClientEnvironmentInspectingService', () => {
             electron: '30.0.0',
           },
         },
+        callPhantom: () => undefined,
         hasDevtoolsHook: true,
         functionToStringTampered: true,
-      }).map((event) => event.kind),
-    ).toEqual(['dev_environment_observed', 'native_tampering_observed']);
+      }).map((event) => [event.kind, event.metadata?.reason]),
+    ).toEqual([
+      ['dev_environment_observed', 'webdriver_enabled'],
+      ['dev_environment_observed', 'phantomjs_callphantom_defined'],
+      ['dev_environment_observed', 'dev_environment'],
+      ['native_tampering_observed', undefined],
+    ]);
+  });
+
+  it('reports headless DevTools and mobile remote debugging reason codes', () => {
+    const service = new ClientEnvironmentInspectingService();
+
+    expect(
+      service.inspect({
+        navigator: {
+          userAgent: 'Mozilla/5.0 HeadlessChrome/124',
+          platform: 'Linux x86_64',
+        },
+        hasDevtoolsHook: true,
+      }).map((event) => event.metadata?.reason),
+    ).toEqual(['headless_devtools_test_stand']);
+
+    expect(
+      service.inspect({
+        navigator: {
+          userAgent: 'Mozilla/5.0 (Linux; Android 14) Mobile Chrome/124',
+          platform: 'Linux armv8',
+        },
+        hasDevtoolsHook: true,
+      }).map((event) => event.metadata?.reason),
+    ).toEqual(['devtools_mobile_remote_debugging']);
   });
 
   it('reports outdated browser and platform conflicts', () => {

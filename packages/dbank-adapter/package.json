@@ -1,15 +1,20 @@
 {
   "name": "@deepcode/antifraud-dbank-adapter",
-  "version": "0.0.0",
+  "version": "0.0.4",
   "description": "D-bank adapter used only by the demo and bank scenario harness.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "registry": "http://antifraud.deep-code.ai/verdaccio/"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run test"
   },
-  "private": true,
   "dependencies": {
-    "@deepcode/antifraud-core": "^0.0.0"
+    "@deepcode/antifraud-core": "0.0.4"
   }
 }

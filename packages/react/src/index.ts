@@ -11,6 +11,10 @@ export type { DeepFraudRootConfigEntity } from './domain/common/entities/DeepFra
 export type { DeepFraudStateEntity } from './domain/common/entities/DeepFraudStateEntity';
 export type { LiveInteractionCollectingConfigEntity } from './domain/live/entities/LiveInteractionCollectingConfigEntity';
 export type { LiveInteractionEventEntity } from './domain/live/entities/LiveInteractionEventEntity';
+export type { PointerClickSampleEntity } from './domain/live/entities/PointerClickSampleEntity';
+export type { PointerMovementSampleEntity, PointerTargetRectEntity } from './domain/live/entities/PointerMovementSampleEntity';
+export type { PointerPatternAnalysisInputEntity } from './domain/live/entities/PointerPatternAnalysisInputEntity';
+export type { PointerPatternVerdictEntity, PointerPatternVerdictLevelEntity } from './domain/live/entities/PointerPatternVerdictEntity';
 export type {
   SpeechRecognitionAlternativeEntity,
   SpeechRecognitionResultEntity,
@@ -42,7 +46,11 @@ export { DeviceFingerprintRiskFactorBuildingService } from './application/servic
 export { DeepFraudStateReducingService } from './application/services/DeepFraudStateReducingService';
 export { LiveInteractionCollectingService } from './application/services/LiveInteractionCollectingService';
 export { LiveInteractionRiskFactorBuildingService } from './application/services/LiveInteractionRiskFactorBuildingService';
+export { PageVisibilityPatternCollectingService, type PageVisibilityPatternCollectingState } from './application/services/PageVisibilityPatternCollectingService';
 export { PhishingTextPatternMatchingService } from './application/services/PhishingTextPatternMatchingService';
+export { PointerPatternAnalyzingService, type PointerPatternCollectingState } from './application/services/PointerPatternAnalyzingService';
+export { PointerMovementCollectingService, type PointerMovementCollectingContext } from './application/services/PointerMovementCollectingService';
+export { PointerPatternMetricsCalculatingService, type PointerPatternMetrics, type PointerSegment } from './application/services/PointerPatternMetricsCalculatingService';
 export { RiskAssessmentNotifyingService } from './application/services/RiskAssessmentNotifyingService';
 export { SessionSignalCollectingService } from './application/services/SessionSignalCollectingService';
 export { SpeechTranscriptCollectingService } from './application/services/SpeechTranscriptCollectingService';
@@ -52,6 +60,6 @@ export { DeepFraud } from './presentation/components/DeepFraud';
 export { DeepFraudRoot } from './presentation/components/DeepFraudRoot';
 export { ReasonCodeList } from './presentation/components/ReasonCodeList';
 export { RiskFactorList } from './presentation/components/RiskFactorList';
-export { RiskMeter } from './presentation/components/RiskMeter';
+export { RiskMeter, type RiskMeterHistoryPointEntity, type RiskMeterProps } from './presentation/components/RiskMeter';
 export { VisualChallengeGate } from './presentation/components/VisualChallengeGate';
 export { useDeepFraud } from './presentation/hooks/useDeepFraud';

@@ -3,6 +3,7 @@ export type KnownRiskFactorKind =
   | 'copy_paste_amount'
   | 'new_recipient'
   | 'concurrent_media'
+  | 'screen_sharing'
   | 'warning_dwell'
   | 'keystroke_dynamics'
   | 'pointer_pattern'

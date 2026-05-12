@@ -138,12 +138,13 @@ describe('BankActionScenarioRecognizingService', () => {
     ['recipient_pasted', 'copy_paste_recipient', ['copy_paste_recipient']],
     ['amount_pasted', 'copy_paste_amount', ['copy_paste_amount']],
     ['form_fill_order_observed', 'form_fill_order', ['multi_field_recipient_bulk_fill']],
-    ['page_hidden', 'page_visibility', ['page_visibility_oscillation']],
+    ['page_hidden', 'page_visibility', ['frequent_page_exits_during_payment_form']],
     ['visual_challenge_started', 'visual_challenge', ['visual_challenge_started']],
     ['keystroke_anomaly_observed', 'keystroke_dynamics', ['keystroke_dynamics_anomaly']],
     ['pointer_anomaly_observed', 'pointer_pattern', ['pointer_pattern_anomaly']],
     ['rapid_scroll_observed', 'pointer_pattern', ['rapid_scroll_pattern']],
     ['click_burst_observed', 'pointer_pattern', ['click_burst_pattern']],
+    ['screen_sharing_observed', 'screen_sharing', ['screen_sharing_heuristic']],
     ['native_tampering_observed', 'native_tampering', ['native_tampering']],
     ['dev_environment_observed', 'dev_environment', ['dev_environment']],
     ['bot_detected', 'bot_detection', ['bot_detection']],
@@ -158,7 +159,9 @@ describe('BankActionScenarioRecognizingService', () => {
     (kind, expectedFactor, expectedReasonCodes) => {
       const service = new BankActionScenarioRecognizingService();
       const actions = kind === 'page_hidden'
-        ? [action('page_hidden', 100), action('page_visible', 300)]
+        ? [action('page_hidden', 100), action('page_visible', 300, {
+          reason: 'frequent_page_exits_during_payment_form',
+        })]
         : [action(kind, 100)];
 
       const result = service.recognize(actions, catalog());
@@ -173,6 +176,63 @@ describe('BankActionScenarioRecognizingService', () => {
       );
     },
   );
+
+  it('recognizes step-up pointer reason codes with a boost', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('pointer_anomaly_observed', 100, {
+          reason: 'pointer_teleport_jump',
+        }),
+      ],
+      catalog(),
+    );
+
+    expect(result.riskSignals.map((signal) => [signal.kind, signal.contribution, signal.reasonCodes?.[0]]))
+      .toEqual([
+        ['pointer_pattern', undefined, 'pointer_teleport_jump'],
+        ['composite_risk_boost', 40, 'pointer_step_up_floor'],
+      ]);
+  });
+
+  it('recognizes monitor pointer reason codes without a boost', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('pointer_anomaly_observed', 100, {
+          reason: 'pointer_double_click_identical_duration',
+        }),
+      ],
+      catalog(),
+    );
+
+    expect(result.recognitions).toEqual([
+      expect.objectContaining({
+        factor: 'pointer_pattern',
+        confidence: 1,
+        reasonCodes: ['pointer_double_click_identical_duration'],
+      }),
+    ]);
+  });
+
+  it('does not recognize allow pointer verdicts as risk traces', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('pointer_anomaly_observed', 100, {
+          reason: 'pointer_touchpad_human_pattern',
+        }),
+      ],
+      catalog(),
+    );
+
+    expect(result.status).toBe('no_match');
+    expect(result.recognitions).toEqual([]);
+    expect(result.riskSignals).toEqual([]);
+  });
 
   it('accepts string server factor metadata and ignores malformed server factor metadata', () => {
     const service = new BankActionScenarioRecognizingService();
@@ -240,6 +300,60 @@ describe('BankActionScenarioRecognizingService', () => {
       ]);
   });
 
+  it('recognizes DevTools JS paste as a step-up trace', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('dev_environment_observed', 100, {
+          reason: 'devtools_console_long_js_paste',
+        }),
+      ],
+      catalog(),
+    );
+
+    expect(result.riskSignals.map((signal) => [signal.kind, signal.contribution, signal.reasonCodes?.[0]]))
+      .toEqual([
+        ['dev_environment', undefined, 'devtools_console_long_js_paste'],
+        ['composite_risk_boost', 45, 'devtools_step_up_floor'],
+      ]);
+  });
+
+  it('recognizes WebDriver as a blocking DevTools automation trace', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('dev_environment_observed', 100, {
+          reason: 'webdriver_enabled',
+        }),
+      ],
+      catalog(),
+    );
+
+    expect(result.riskSignals.map((signal) => [signal.kind, signal.contribution, signal.reasonCodes?.[0]]))
+      .toEqual([
+        ['bot_detection', undefined, 'webdriver_enabled'],
+        ['composite_risk_boost', 35, 'devtools_bot_block_floor'],
+      ]);
+  });
+
+  it('does not recognize allow-listed DevTools work-account traces as risk', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('dev_environment_observed', 100, {
+          reason: 'devtools_allowed_work_account',
+        }),
+      ],
+      catalog(),
+    );
+
+    expect(result.status).toBe('no_match');
+    expect(result.riskSignals).toEqual([]);
+  });
+
   it('recognizes Selenium SendKeys signatures as blocking keystroke traces', () => {
     const service = new BankActionScenarioRecognizingService();
 
@@ -280,6 +394,40 @@ describe('BankActionScenarioRecognizingService', () => {
       ]);
   });
 
+  it('recognizes KST-16 one-hand typing as a false-positive-risk step-up trace', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('keystroke_anomaly_observed', 100, {
+          reason: 'one_hand_typing_pattern',
+          injuryReported: true,
+        }),
+      ],
+      catalog(),
+    );
+
+    expect(result.riskSignals).toEqual([
+      expect.objectContaining({
+        kind: 'keystroke_dynamics',
+        reasonCodes: ['one_hand_typing_pattern'],
+        metadata: expect.objectContaining({
+          injuryReported: true,
+          falsePositiveRisk: true,
+        }),
+      }),
+      expect.objectContaining({
+        kind: 'composite_risk_boost',
+        contribution: 30,
+        reasonCodes: ['keystroke_step_up_floor'],
+        metadata: expect.objectContaining({
+          falsePositiveRisk: true,
+          matchedReasonCodes: ['one_hand_typing_pattern'],
+        }),
+      }),
+    ]);
+  });
+
   it('does not recognize allow keystroke verdicts as risk traces', () => {
     const service = new BankActionScenarioRecognizingService();
 
@@ -297,6 +445,13 @@ describe('BankActionScenarioRecognizingService', () => {
         action('keystroke_anomaly_observed', 300, {
           cadenceRatio: 0.6,
           reason: 'local_baseline_fast_cadence_match',
+        }),
+        action('keystroke_anomaly_observed', 400, {
+          reason: 'voice_to_text_no_keystroke_factor',
+          inputMethod: 'voice_to_text',
+        }),
+        action('voice_to_text_no_keystroke_factor', 500, {
+          inputMethod: 'voice_to_text',
         }),
       ],
       catalog(),
@@ -336,6 +491,152 @@ describe('BankActionScenarioRecognizingService', () => {
         reasonCodes: [reason],
       }),
     ]);
+  });
+
+  it('recognizes KST-18 constituent factors through the harness trace', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('media_active', 100),
+        action('page_hidden', 200),
+        action('page_visible', 300, {
+          reason: 'frequent_page_exits_during_payment_form',
+        }),
+        action('keystroke_anomaly_observed', 400),
+      ],
+      catalog(),
+    );
+
+    expect(result.riskSignals.map((signal) => [signal.kind, signal.reasonCodes?.[0]])).toEqual([
+      ['concurrent_media', 'concurrent_media_active'],
+      ['page_visibility', 'frequent_page_exits_during_payment_form'],
+      ['composite_risk_boost', 'frequent_page_exits_during_payment_form'],
+      ['keystroke_dynamics', 'keystroke_dynamics_anomaly'],
+    ]);
+  });
+
+  it('recognizes KST-19 copy-paste metadata through the harness trace', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('amount_pasted', 100, {
+          manualKeyCount: 0,
+          keyCount: 0,
+        }),
+        action('keystroke_anomaly_observed', 200),
+      ],
+      catalog(),
+    );
+
+    expect(result.riskSignals).toEqual([
+      expect.objectContaining({
+        kind: 'copy_paste_amount',
+        metadata: {
+          manualKeyCount: 0,
+          keyCount: 0,
+          eventCount: 1,
+          observations: [
+            {
+              manualKeyCount: 0,
+              keyCount: 0,
+            },
+          ],
+        },
+      }),
+      expect.objectContaining({
+        kind: 'keystroke_dynamics',
+      }),
+    ]);
+  });
+
+  it('recognizes KST-20 first-time device metadata through the harness trace', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('keystroke_anomaly_observed', 100),
+        action('device_fingerprint_observed', 200, {
+          reason: 'first_time_device',
+          firstSeenDevice: true,
+        }),
+      ],
+      catalog(),
+    );
+
+    expect(result.riskSignals).toEqual([
+      expect.objectContaining({
+        kind: 'keystroke_dynamics',
+      }),
+      expect.objectContaining({
+        kind: 'device_fingerprint',
+        reasonCodes: ['first_time_device'],
+        metadata: {
+          reason: 'first_time_device',
+          firstSeenDevice: true,
+          eventCount: 1,
+          observations: [
+            {
+              reason: 'first_time_device',
+              firstSeenDevice: true,
+            },
+          ],
+        },
+      }),
+    ]);
+  });
+
+  it('recognizes phishing URL traces with preserved URL metadata and floor boost', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('phishing_url_observed', 100, {
+          source: 'clipboard',
+          url: 'https://gosuslugi-confirm.com',
+        }),
+      ],
+      catalog(),
+    );
+
+    expect(result.recognitions).toEqual([
+      expect.objectContaining({
+        factor: 'phishing_url',
+        reasonCodes: ['phishing_url_clipboard_gosuslugi_typosquat'],
+        metadata: expect.objectContaining({
+          source: 'clipboard',
+          url: 'https://gosuslugi-confirm.com',
+        }),
+      }),
+      expect.objectContaining({
+        factor: 'composite_risk_boost',
+        contribution: 20,
+        reasonCodes: ['phishing_url_step_up_floor'],
+      }),
+    ]);
+    expect(result.riskSignals.map((signal) => [signal.kind, signal.contribution, signal.reasonCodes?.[0]]))
+      .toEqual([
+        ['phishing_url', undefined, 'phishing_url_clipboard_gosuslugi_typosquat'],
+        ['composite_risk_boost', 20, 'phishing_url_step_up_floor'],
+      ]);
+  });
+
+  it('does not recognize allowlisted phishing URL traces as risk', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('phishing_url_observed', 100, {
+          url: 'https://sberbank.ru/online',
+        }),
+      ],
+      catalog(),
+    );
+
+    expect(result.status).toBe('no_match');
+    expect(result.recognitions).toEqual([]);
+    expect(result.riskSignals).toEqual([]);
   });
 
   it('recognizes missing typing corrections as monitor-strength keystroke dynamics', () => {
