@@ -92,6 +92,35 @@ describe('LiveInteractionCollectingService', () => {
     expect(events).toEqual([]);
   });
 
+  it('captures pasted transfer amounts in amount fields', () => {
+    const documentTarget = new FakeDocumentTarget();
+    const events: LiveInteractionEventEntity[] = [];
+
+    new LiveInteractionCollectingService().install({
+      target: { document: documentTarget },
+      now: () => 250,
+      onEvent: (event) => events.push(event),
+    });
+
+    documentTarget.dispatch('paste', {
+      target: { name: 'transferAmount', type: 'number', placeholder: 'Amount' },
+      clipboardData: {
+        getData: () => '87000',
+      },
+    });
+
+    expect(events).toEqual([
+      {
+        kind: 'amount_pasted',
+        atMs: 250,
+        metadata: {
+          targetText: 'transferAmount number Amount',
+          pastedLength: 5,
+        },
+      },
+    ]);
+  });
+
   it('captures suspicious bank chat input text', () => {
     const documentTarget = new FakeDocumentTarget();
     const events: LiveInteractionEventEntity[] = [];

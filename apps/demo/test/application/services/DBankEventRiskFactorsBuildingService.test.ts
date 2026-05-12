@@ -9,6 +9,7 @@ describe('DBankEventRiskFactorsBuildingService', () => {
     expect(
       service.build([
         event('recipient_pasted', 100),
+        event('amount_pasted', 150),
         event('recipient_created', 200),
         event('server_factor_observed', 300, { factor: 'amount_anomaly' }),
       ]),
@@ -19,6 +20,15 @@ describe('DBankEventRiskFactorsBuildingService', () => {
         contribution: 40,
         maxContribution: 40,
         reasonCodes: ['copy_paste_recipient'],
+        source: 'live',
+        metadata: undefined,
+      },
+      {
+        kind: 'copy_paste_amount',
+        status: 'ok',
+        contribution: 20,
+        maxContribution: 20,
+        reasonCodes: ['copy_paste_amount'],
         source: 'live',
         metadata: undefined,
       },

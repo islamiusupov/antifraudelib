@@ -1,5 +1,6 @@
 export type KnownRiskFactorKind =
   | 'copy_paste_recipient'
+  | 'copy_paste_amount'
   | 'new_recipient'
   | 'concurrent_media'
   | 'warning_dwell'

@@ -14,6 +14,15 @@ export class DBankLiveFactorExtractingService {
         source: 'live',
       });
     }
+    if (this.hasEvent(events, 'amount_pasted')) {
+      signals.push({
+        kind: 'copy_paste_amount',
+        detected: true,
+        confidence: 1,
+        reasonCodes: ['copy_paste_amount'],
+        source: 'live',
+      });
+    }
     const recipientCreatedEvent = events.find((event) => event.kind === 'recipient_created');
     if (recipientCreatedEvent !== undefined) {
       signals.push(this.newRecipientSignal(recipientCreatedEvent));

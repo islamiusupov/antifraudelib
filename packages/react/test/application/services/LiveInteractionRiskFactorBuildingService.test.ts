@@ -9,6 +9,7 @@ describe('LiveInteractionRiskFactorBuildingService', () => {
     expect(
       service.build([
         event('recipient_pasted', 100),
+        event('amount_pasted', 150),
         event('warning_shown', 200),
         event('warning_confirmed', 900),
         event('page_hidden', 1000),
@@ -24,6 +25,7 @@ describe('LiveInteractionRiskFactorBuildingService', () => {
       ]).map((factor) => [factor.kind, factor.contribution, factor.reasonCodes?.[0]]),
     ).toEqual([
       ['copy_paste_recipient', 40, 'copy_paste_recipient'],
+      ['copy_paste_amount', 20, 'copy_paste_amount'],
       ['warning_dwell', 18, 'warning_dwell_too_short'],
       ['page_visibility', 20, 'page_visibility_oscillation'],
       ['pointer_pattern', 16, 'pointer_pattern_anomaly'],

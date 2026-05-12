@@ -5,6 +5,7 @@ import { SpeechTranscriptCollectingService } from './SpeechTranscriptCollectingS
 
 type UninstallingLiveInteractionCollection = () => void;
 
+const AMOUNT_FIELD_PATTERN = /(amount|sum|total|price|payment|rub|ruble|₽|сумм|руб)/i;
 const RECIPIENT_FIELD_PATTERN = /(recipient|beneficiary|iban|account|card|phone|получател|счет|счёт|карта|телефон)/i;
 const CONFIRM_TEXT_PATTERN = /(confirm|continue|submit|pay|transfer|подтверд|продолж|перевести|отправ)/i;
 const DEFAULT_FAST_KEY_INTERVAL_MS = 60;
@@ -32,11 +33,19 @@ export class LiveInteractionCollectingService {
       const handlePaste = (event: LiveInteractionDomEventEntity) => {
         const targetText = this.targetText(event.target);
         const pastedText = event.clipboardData?.getData('text') ?? '';
-        if (!RECIPIENT_FIELD_PATTERN.test(targetText) && !this.looksLikeRecipient(pastedText)) return;
-        this.emit(config, 'recipient_pasted', {
-          targetText,
-          pastedLength: pastedText.length,
-        });
+        if (RECIPIENT_FIELD_PATTERN.test(targetText) || this.looksLikeRecipient(pastedText)) {
+          this.emit(config, 'recipient_pasted', {
+            targetText,
+            pastedLength: pastedText.length,
+          });
+          return;
+        }
+        if (this.isAmountPaste(event.target, targetText, pastedText)) {
+          this.emit(config, 'amount_pasted', {
+            targetText,
+            pastedLength: pastedText.length,
+          });
+        }
       };
       const handleVisibilityChange = () => {
         this.emit(config, documentTarget.visibilityState === 'hidden' ? 'page_hidden' : 'page_visible');
@@ -178,6 +187,7 @@ export class LiveInteractionCollectingService {
     const record = target as Record<string, unknown>;
     return [
       record.name,
+      record.type,
       record.id,
       record.placeholder,
       record.ariaLabel,
@@ -191,6 +201,23 @@ export class LiveInteractionCollectingService {
   private looksLikeRecipient(text: string): boolean {
     const compact = text.replace(/\s+/g, '');
     return /^\+?\d{10,20}$/.test(compact) || /^[A-Z]{2}\d{12,32}$/i.test(compact);
+  }
+
+  private isAmountPaste(target: unknown, targetText: string, pastedText: string): boolean {
+    if (!this.looksLikeAmount(pastedText)) return false;
+    if (AMOUNT_FIELD_PATTERN.test(targetText)) return true;
+    if (target === null || typeof target !== 'object') return false;
+    const type = (target as Record<string, unknown>).type;
+    return type === 'number' && !RECIPIENT_FIELD_PATTERN.test(targetText);
+  }
+
+  private looksLikeAmount(text: string): boolean {
+    const normalized = text
+      .trim()
+      .replace(/\s+/g, '')
+      .replace(/[$€£₽]/g, '')
+      .replace(/rub|ruble|руб/gi, '');
+    return /^[+-]?\d{1,9}([.,]\d{1,2})?$/.test(normalized);
   }
 
   private emit(

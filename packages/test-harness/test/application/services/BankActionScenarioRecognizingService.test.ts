@@ -89,6 +89,7 @@ describe('BankActionScenarioRecognizingService', () => {
     ['media_active', 'concurrent_media', ['concurrent_media_active']],
     ['recipient_created', 'new_recipient', ['new_recipient_in_flow']],
     ['recipient_pasted', 'copy_paste_recipient', ['copy_paste_recipient']],
+    ['amount_pasted', 'copy_paste_amount', ['copy_paste_amount']],
     ['page_hidden', 'page_visibility', ['page_visibility_oscillation']],
     ['visual_challenge_started', 'visual_challenge', ['visual_challenge_started']],
     ['keystroke_anomaly_observed', 'keystroke_dynamics', ['keystroke_dynamics_anomaly']],

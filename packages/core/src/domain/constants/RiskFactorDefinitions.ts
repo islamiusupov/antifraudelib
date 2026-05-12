@@ -2,6 +2,7 @@ import type { FactorDefinitionEntity } from '../risk/entities/FactorDefinitionEn
 
 export const RISK_FACTOR_DEFINITIONS: FactorDefinitionEntity[] = [
   { kind: 'copy_paste_recipient', maxContribution: 40, source: 'live', tier: 'LIVE' },
+  { kind: 'copy_paste_amount', maxContribution: 20, source: 'live', tier: 'LIVE' },
   { kind: 'keystroke_dynamics', maxContribution: 30, source: 'live', tier: 'LIVE' },
   { kind: 'pointer_pattern', maxContribution: 20, source: 'paper', tier: 'PAPER' },
   { kind: 'page_visibility', maxContribution: 25, source: 'live', tier: 'LIVE' },

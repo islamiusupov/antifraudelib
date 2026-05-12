@@ -12,6 +12,7 @@ export class LiveInteractionRiskFactorBuildingService {
     const signals: RiskSignalEntity[] = [];
 
     this.pushIfPresent(signals, events, 'recipient_pasted', 'copy_paste_recipient', ['copy_paste_recipient']);
+    this.pushIfPresent(signals, events, 'amount_pasted', 'copy_paste_amount', ['copy_paste_amount']);
     if (this.hasFastWarningConfirmation(events)) {
       signals.push(this.signal('warning_dwell', ['warning_dwell_too_short'], 0.9));
     }

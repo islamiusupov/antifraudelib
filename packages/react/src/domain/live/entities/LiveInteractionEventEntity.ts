@@ -1,6 +1,7 @@
 export type LiveInteractionEventEntity = {
   kind:
     | 'recipient_pasted'
+    | 'amount_pasted'
     | 'warning_shown'
     | 'warning_confirmed'
     | 'page_hidden'

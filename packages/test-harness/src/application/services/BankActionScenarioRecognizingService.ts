@@ -36,6 +36,9 @@ export class BankActionScenarioRecognizingService {
     if (this.hasAction(actions, 'recipient_pasted')) {
       recognitions.push(this.createRecognition('copy_paste_recipient', 1, ['copy_paste_recipient'], catalog));
     }
+    if (this.hasAction(actions, 'amount_pasted')) {
+      recognitions.push(this.createRecognition('copy_paste_amount', 1, ['copy_paste_amount'], catalog));
+    }
     if (this.hasFastWarningConfirmation(actions)) {
       recognitions.push(this.createRecognition('warning_dwell', 0.9, ['warning_dwell_too_short'], catalog));
     }

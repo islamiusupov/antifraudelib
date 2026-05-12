@@ -29,6 +29,20 @@ describe('DBankLiveFactorExtractingService', () => {
     ]);
   });
 
+  it('extracts copy-paste amount live signals', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(service.extract([event('amount_pasted', 100)])).toEqual([
+      {
+        kind: 'copy_paste_amount',
+        detected: true,
+        confidence: 1,
+        reasonCodes: ['copy_paste_amount'],
+        source: 'live',
+      },
+    ]);
+  });
+
   it('extracts warning dwell when confirmation is too fast', () => {
     const service = new DBankLiveFactorExtractingService();
 

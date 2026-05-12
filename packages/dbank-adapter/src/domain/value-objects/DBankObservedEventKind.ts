@@ -2,6 +2,7 @@ export type DBankObservedEventKind =
   | 'bank_opened'
   | 'transfer_opened'
   | 'recipient_pasted'
+  | 'amount_pasted'
   | 'recipient_created'
   | 'transfer_submitted'
   | 'media_active'
