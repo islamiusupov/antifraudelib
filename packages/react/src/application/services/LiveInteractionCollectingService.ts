@@ -4,6 +4,12 @@ import { PhishingTextPatternMatchingService } from './PhishingTextPatternMatchin
 import { SpeechTranscriptCollectingService } from './SpeechTranscriptCollectingService';
 
 type UninstallingLiveInteractionCollection = () => void;
+type FieldInputTrackingState = {
+  keyCount: number;
+  previousValue: string;
+  lastRecipientPasteValue?: string;
+  lastAmountPasteValue?: string;
+};
 
 const AMOUNT_FIELD_PATTERN = /(amount|sum|total|price|payment|rub|ruble|₽|сумм|руб)/i;
 const RECIPIENT_FIELD_PATTERN = /(recipient|beneficiary|iban|account|card|phone|получател|счет|счёт|карта|телефон)/i;
@@ -28,21 +34,25 @@ export class LiveInteractionCollectingService {
     let previousKeyAtMs: number | undefined;
     let fastKeyCount = 0;
     let rapidScrollTimes: number[] = [];
+    const inputStates = new WeakMap<object, FieldInputTrackingState>();
 
     if (documentTarget !== undefined) {
       const handlePaste = (event: LiveInteractionDomEventEntity) => {
         const targetText = this.targetText(event.target);
+        const targetDescriptor = this.targetDescriptor(event.target);
         const pastedText = event.clipboardData?.getData('text') ?? '';
         if (RECIPIENT_FIELD_PATTERN.test(targetText) || this.looksLikeRecipient(pastedText)) {
+          this.recordRecipientPaste(inputStates, event.target, pastedText);
           this.emit(config, 'recipient_pasted', {
-            targetText,
+            targetText: targetDescriptor,
             pastedLength: pastedText.length,
           });
           return;
         }
         if (this.isAmountPaste(event.target, targetText, pastedText)) {
+          this.recordAmountPaste(inputStates, event.target, pastedText);
           this.emit(config, 'amount_pasted', {
-            targetText,
+            targetText: targetDescriptor,
             pastedLength: pastedText.length,
           });
         }
@@ -72,6 +82,7 @@ export class LiveInteractionCollectingService {
           this.emit(config, 'keystroke_anomaly_observed', { reason: 'untrusted_key_event' });
           return;
         }
+        this.recordTypedKey(inputStates, event.target, event.key);
         if (previousKeyAtMs !== undefined && atMs - previousKeyAtMs <= (config.fastKeyIntervalMs ?? DEFAULT_FAST_KEY_INTERVAL_MS)) {
           fastKeyCount += 1;
         } else {
@@ -102,6 +113,8 @@ export class LiveInteractionCollectingService {
         }
       };
       const handleInput = (event: LiveInteractionDomEventEntity) => {
+        this.detectRecipientFilledWithoutTyping(config, inputStates, event.target);
+        this.detectAmountFilledWithoutTyping(config, inputStates, event.target);
         this.scanText(config, this.targetText(event.target), 'input');
       };
 
@@ -186,13 +199,23 @@ export class LiveInteractionCollectingService {
     if (target === null || typeof target !== 'object') return '';
     const record = target as Record<string, unknown>;
     return [
+      this.targetDescriptor(target),
+      record.value,
+    ]
+      .filter((value): value is string => typeof value === 'string')
+      .join(' ');
+  }
+
+  private targetDescriptor(target: unknown): string {
+    if (target === null || typeof target !== 'object') return '';
+    const record = target as Record<string, unknown>;
+    return [
       record.name,
       record.type,
       record.id,
       record.placeholder,
       record.ariaLabel,
       record.textContent,
-      record.value,
     ]
       .filter((value): value is string => typeof value === 'string')
       .join(' ');
@@ -218,6 +241,134 @@ export class LiveInteractionCollectingService {
       .replace(/[$€£₽]/g, '')
       .replace(/rub|ruble|руб/gi, '');
     return /^[+-]?\d{1,9}([.,]\d{1,2})?$/.test(normalized);
+  }
+
+  private recordRecipientPaste(
+    inputStates: WeakMap<object, FieldInputTrackingState>,
+    target: unknown,
+    pastedText: string,
+  ): void {
+    const state = this.fieldState(inputStates, target);
+    if (state === undefined) return;
+    state.lastRecipientPasteValue = pastedText;
+  }
+
+  private recordAmountPaste(
+    inputStates: WeakMap<object, FieldInputTrackingState>,
+    target: unknown,
+    pastedText: string,
+  ): void {
+    const state = this.fieldState(inputStates, target);
+    if (state === undefined) return;
+    state.lastAmountPasteValue = pastedText;
+  }
+
+  private recordTypedKey(
+    inputStates: WeakMap<object, FieldInputTrackingState>,
+    target: unknown,
+    key: string | undefined,
+  ): void {
+    if (!this.isTextInputKey(key)) return;
+    const state = this.fieldState(inputStates, target);
+    if (state === undefined) return;
+    state.keyCount += 1;
+  }
+
+  private detectRecipientFilledWithoutTyping(
+    config: LiveInteractionCollectingConfigEntity,
+    inputStates: WeakMap<object, FieldInputTrackingState>,
+    target: unknown,
+  ): void {
+    const state = this.fieldState(inputStates, target);
+    if (state === undefined) return;
+
+    const targetText = this.targetText(target);
+    const targetValue = this.targetValue(target);
+    if (!this.isRecipientTarget(targetText, targetValue)) return;
+
+    const previousValue = state.previousValue;
+    state.previousValue = targetValue;
+    if (targetValue === '' || targetValue === state.lastRecipientPasteValue) return;
+
+    const grewBy = targetValue.length - previousValue.length;
+    const wasFilledWithoutTyping = state.keyCount === 0 && targetValue.length >= 3;
+    const wasBulkFilled = grewBy >= 6;
+    if (!wasFilledWithoutTyping && !wasBulkFilled) return;
+
+    this.emit(config, 'recipient_pasted', {
+      targetText: this.targetDescriptor(target),
+      pastedLength: targetValue.length,
+      reason: wasFilledWithoutTyping ? 'filled_without_typing' : 'bulk_input_jump',
+    });
+    state.lastRecipientPasteValue = targetValue;
+  }
+
+  private detectAmountFilledWithoutTyping(
+    config: LiveInteractionCollectingConfigEntity,
+    inputStates: WeakMap<object, FieldInputTrackingState>,
+    target: unknown,
+  ): void {
+    const state = this.fieldState(inputStates, target);
+    if (state === undefined) return;
+
+    const targetValue = this.targetValue(target);
+    const targetDescriptor = this.targetDescriptor(target);
+    if (!this.isAmountTarget(target, targetDescriptor, targetValue)) return;
+
+    const previousValue = state.previousValue;
+    state.previousValue = targetValue;
+    if (targetValue === '' || targetValue === state.lastAmountPasteValue) return;
+
+    const grewBy = targetValue.length - previousValue.length;
+    const wasFilledWithoutTyping = state.keyCount === 0 && targetValue.length >= 2;
+    const wasBulkFilled = grewBy >= 4;
+    if (!wasFilledWithoutTyping && !wasBulkFilled) return;
+
+    this.emit(config, 'amount_pasted', {
+      targetText: targetDescriptor,
+      pastedLength: targetValue.length,
+      reason: wasFilledWithoutTyping ? 'filled_without_typing' : 'bulk_input_jump',
+    });
+    state.lastAmountPasteValue = targetValue;
+  }
+
+  private isRecipientTarget(targetText: string, targetValue: string): boolean {
+    return RECIPIENT_FIELD_PATTERN.test(targetText) || this.looksLikeRecipient(targetValue);
+  }
+
+  private isAmountTarget(target: unknown, targetDescriptor: string, targetValue: string): boolean {
+    if (!this.looksLikeAmount(targetValue)) return false;
+    if (AMOUNT_FIELD_PATTERN.test(targetDescriptor)) return true;
+    if (target === null || typeof target !== 'object') return false;
+    const type = (target as Record<string, unknown>).type;
+    return type === 'number' && !RECIPIENT_FIELD_PATTERN.test(targetDescriptor);
+  }
+
+  private targetValue(target: unknown): string {
+    if (target === null || typeof target !== 'object') return '';
+    const value = (target as Record<string, unknown>).value;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return String(value);
+    return '';
+  }
+
+  private fieldState(
+    inputStates: WeakMap<object, FieldInputTrackingState>,
+    target: unknown,
+  ): FieldInputTrackingState | undefined {
+    if (target === null || typeof target !== 'object') return undefined;
+    const existingState = inputStates.get(target);
+    if (existingState !== undefined) return existingState;
+    const nextState = {
+      keyCount: 0,
+      previousValue: this.targetValue(target),
+    };
+    inputStates.set(target, nextState);
+    return nextState;
+  }
+
+  private isTextInputKey(key: string | undefined): boolean {
+    return key === undefined || key.length === 1 || key === 'Backspace' || key === 'Delete';
   }
 
   private emit(

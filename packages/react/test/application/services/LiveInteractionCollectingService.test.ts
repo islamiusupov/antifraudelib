@@ -121,6 +121,162 @@ describe('LiveInteractionCollectingService', () => {
     ]);
   });
 
+  it('captures amount fields filled without typing when paste events are missing', () => {
+    const documentTarget = new FakeDocumentTarget();
+    const events: LiveInteractionEventEntity[] = [];
+    const amountTarget = { name: 'transferAmount', type: 'number', value: '87000' };
+
+    new LiveInteractionCollectingService().install({
+      target: { document: documentTarget },
+      now: () => 255,
+      onEvent: (event) => events.push(event),
+    });
+
+    documentTarget.dispatch('input', {
+      target: amountTarget,
+    });
+
+    expect(events).toEqual([
+      {
+        kind: 'amount_pasted',
+        atMs: 255,
+        metadata: {
+          targetText: 'transferAmount number',
+          pastedLength: 5,
+          reason: 'filled_without_typing',
+        },
+      },
+    ]);
+  });
+
+  it('does not duplicate amount paste when input fires after a paste event', () => {
+    const documentTarget = new FakeDocumentTarget();
+    const events: LiveInteractionEventEntity[] = [];
+    const amountTarget = { name: 'transferAmount', type: 'number', value: '' };
+
+    new LiveInteractionCollectingService().install({
+      target: { document: documentTarget },
+      now: () => 257,
+      onEvent: (event) => events.push(event),
+    });
+
+    documentTarget.dispatch('paste', {
+      target: amountTarget,
+      clipboardData: {
+        getData: () => '87000',
+      },
+    });
+    amountTarget.value = '87000';
+    documentTarget.dispatch('input', { target: amountTarget });
+
+    expect(events.map((event) => event.kind)).toEqual(['amount_pasted']);
+  });
+
+  it('captures amount bulk input jumps after an initial typed digit', () => {
+    const documentTarget = new FakeDocumentTarget();
+    const events: LiveInteractionEventEntity[] = [];
+    const amountTarget = { name: 'transferAmount', type: 'number', value: '' };
+    let now = 600;
+
+    new LiveInteractionCollectingService().install({
+      target: { document: documentTarget },
+      now: () => now,
+      onEvent: (event) => events.push(event),
+    });
+
+    documentTarget.dispatch('keydown', { target: amountTarget, key: '8', isTrusted: true });
+    amountTarget.value = '8';
+    documentTarget.dispatch('input', { target: amountTarget });
+    now = 700;
+    amountTarget.value = '87000';
+    documentTarget.dispatch('input', { target: amountTarget });
+
+    expect(events).toEqual([
+      {
+        kind: 'amount_pasted',
+        atMs: 700,
+        metadata: {
+          targetText: 'transferAmount number',
+          pastedLength: 5,
+          reason: 'bulk_input_jump',
+        },
+      },
+    ]);
+  });
+
+  it('captures recipient fields filled without typing when paste events are missing', () => {
+    const documentTarget = new FakeDocumentTarget();
+    const events: LiveInteractionEventEntity[] = [];
+    const recipientTarget = { name: 'recipientAccount', value: '40817810000000000001' };
+
+    new LiveInteractionCollectingService().install({
+      target: { document: documentTarget },
+      now: () => 260,
+      onEvent: (event) => events.push(event),
+    });
+
+    documentTarget.dispatch('input', {
+      target: recipientTarget,
+    });
+
+    expect(events).toEqual([
+      {
+        kind: 'recipient_pasted',
+        atMs: 260,
+        metadata: {
+          targetText: 'recipientAccount',
+          pastedLength: 20,
+          reason: 'filled_without_typing',
+        },
+      },
+    ]);
+  });
+
+  it('does not flag recipient values typed one key at a time', () => {
+    const documentTarget = new FakeDocumentTarget();
+    const events: LiveInteractionEventEntity[] = [];
+    const recipientTarget = { name: 'recipientAccount', value: '' };
+    let now = 300;
+
+    new LiveInteractionCollectingService().install({
+      target: { document: documentTarget },
+      now: () => now,
+      onEvent: (event) => events.push(event),
+    });
+
+    '408178100000'.split('').forEach((digit) => {
+      now += 100;
+      documentTarget.dispatch('keydown', { target: recipientTarget, key: digit, isTrusted: true });
+      recipientTarget.value += digit;
+      documentTarget.dispatch('input', { target: recipientTarget });
+    });
+
+    expect(events).toEqual([]);
+  });
+
+  it('does not duplicate recipient paste when input fires after a paste event', () => {
+    const documentTarget = new FakeDocumentTarget();
+    const events: LiveInteractionEventEntity[] = [];
+    const recipientTarget = { name: 'recipientAccount', value: '' };
+
+    new LiveInteractionCollectingService().install({
+      target: { document: documentTarget },
+      now: () => 500,
+      onEvent: (event) => events.push(event),
+    });
+
+    documentTarget.dispatch('paste', {
+      target: recipientTarget,
+      clipboardData: {
+        getData: () => '40817810000000000001',
+      },
+    });
+    recipientTarget.value = '40817810000000000001';
+    documentTarget.dispatch('input', { target: recipientTarget });
+
+    expect(events.map((event) => event.kind)).toEqual(['recipient_pasted']);
+  });
+
   it('captures suspicious bank chat input text', () => {
     const documentTarget = new FakeDocumentTarget();
     const events: LiveInteractionEventEntity[] = [];
