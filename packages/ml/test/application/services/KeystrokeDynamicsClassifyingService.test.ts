@@ -34,7 +34,14 @@ describe('KeystrokeDynamicsClassifyingService', () => {
       reasonCodes: ['keystroke_dynamics_anomaly'],
       source: 'live',
       metadata: {
-        classifier: 'scaled_manhattan',
+        classifier: 'keystroke-dynamics-timing-v0',
+        modelScore: 1,
+        features: {
+          meanRelativeDeviation: 4.14,
+          maxRelativeDeviation: 10.2,
+          longPauseRatio: 0.5,
+          sampleSize: 4,
+        },
       },
     });
   });

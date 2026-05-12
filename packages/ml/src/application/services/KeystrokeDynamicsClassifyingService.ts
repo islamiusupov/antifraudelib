@@ -1,10 +1,18 @@
 import type { RiskSignalEntity } from '@deepcode/antifraud-core';
 import type { KeystrokeDynamicsInputEntity } from '../../domain/entities/KeystrokeDynamicsInputEntity';
+import { KeystrokeDynamicsFeatureVectorBuildingService } from './KeystrokeDynamicsFeatureVectorBuildingService';
+import { KeystrokeDynamicsModelScoringService } from './KeystrokeDynamicsModelScoringService';
 
 export class KeystrokeDynamicsClassifyingService {
+  constructor(
+    private readonly keystrokeDynamicsFeatureVectorBuildingService = new KeystrokeDynamicsFeatureVectorBuildingService(),
+    private readonly keystrokeDynamicsModelScoringService = new KeystrokeDynamicsModelScoringService(),
+  ) {}
+
   classify(input: KeystrokeDynamicsInputEntity): RiskSignalEntity {
-    const score = this.scaledManhattan(input.intervalsMs, input.baselineMedianMs);
-    if (score < 1.5) {
+    const features = this.keystrokeDynamicsFeatureVectorBuildingService.build(input);
+    const modelScore = this.keystrokeDynamicsModelScoringService.score(features);
+    if (modelScore.score < modelScore.threshold) {
       return this.inactive();
     }
 
@@ -15,17 +23,11 @@ export class KeystrokeDynamicsClassifyingService {
       reasonCodes: ['keystroke_dynamics_anomaly'],
       source: 'live',
       metadata: {
-        classifier: 'scaled_manhattan',
+        classifier: modelScore.modelId,
+        modelScore: modelScore.score,
+        features: modelScore.features,
       },
     };
-  }
-
-  private scaledManhattan(intervalsMs: number[], baselineMedianMs: number): number {
-    if (intervalsMs.length === 0 || baselineMedianMs <= 0) return 0;
-    const totalDeviation = intervalsMs.reduce((total, intervalMs) => {
-      return total + Math.abs(intervalMs - baselineMedianMs) / baselineMedianMs;
-    }, 0);
-    return totalDeviation / intervalsMs.length;
   }
 
   private inactive(): RiskSignalEntity {

@@ -1,43 +1,32 @@
 import type { RiskSignalEntity } from '@deepcode/antifraud-core';
 import type { PhishingUrlInputEntity } from '../../domain/entities/PhishingUrlInputEntity';
+import { PhishingUrlFeatureVectorBuildingService } from './PhishingUrlFeatureVectorBuildingService';
+import { PhishingUrlModelScoringService } from './PhishingUrlModelScoringService';
 
 export class PhishingUrlClassifyingService {
+  constructor(
+    private readonly phishingUrlFeatureVectorBuildingService = new PhishingUrlFeatureVectorBuildingService(),
+    private readonly phishingUrlModelScoringService = new PhishingUrlModelScoringService(),
+  ) {}
+
   classify(input: PhishingUrlInputEntity): RiskSignalEntity {
-    const hostname = this.hostname(input.url);
-    if (hostname !== undefined && input.allowedDomains.includes(hostname)) {
-      return this.inactive();
-    }
-    if (this.hasSuspiciousPattern(input.url)) {
+    const features = this.phishingUrlFeatureVectorBuildingService.build(input);
+    const modelScore = this.phishingUrlModelScoringService.score(features);
+    if (modelScore.score >= modelScore.threshold) {
       return {
         kind: 'phishing_url',
         detected: true,
-        confidence: 1,
+        confidence: modelScore.score,
         reasonCodes: ['phishing_url_pattern'],
         source: 'live',
         metadata: {
-          classifier: 'url_pattern',
+          classifier: modelScore.modelId,
+          modelScore: modelScore.score,
+          features: modelScore.features,
         },
       };
     }
     return this.inactive();
-  }
-
-  private hostname(url: string): string | undefined {
-    try {
-      return new URL(url).hostname;
-    } catch {
-      return undefined;
-    }
-  }
-
-  private hasSuspiciousPattern(url: string): boolean {
-    const normalizedUrl = url.toLowerCase();
-    return (
-      normalizedUrl.includes('safe-account') ||
-      normalizedUrl.includes('secure-account') ||
-      normalizedUrl.includes('cbr') ||
-      normalizedUrl.includes('central-bank')
-    );
   }
 
   private inactive(): RiskSignalEntity {

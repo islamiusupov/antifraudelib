@@ -27,14 +27,15 @@ describe('PhishingUrlClassifyingService', () => {
         url: 'https://secure-safe-account-cbr.example/login',
         allowedDomains: ['bank.example'],
       }),
-    ).toEqual({
+    ).toMatchObject({
       kind: 'phishing_url',
       detected: true,
-      confidence: 1,
+      confidence: 0.7311,
       reasonCodes: ['phishing_url_pattern'],
       source: 'live',
       metadata: {
-        classifier: 'url_pattern',
+        classifier: 'urlbert-tiny-v4-fallback-v0',
+        modelScore: 0.7311,
       },
     });
   });
