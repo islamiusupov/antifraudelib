@@ -20,6 +20,7 @@ describe('BankActionScenarioRecognizingService', () => {
     );
 
     expect(result.status).toBe('recognized');
+    expect(result.compositeRecognitions).toEqual([]);
     expect(result.recognitions[0]).toMatchObject({
       factor: 'copy_paste_recipient',
       confidence: 1,
@@ -67,6 +68,7 @@ describe('BankActionScenarioRecognizingService', () => {
     expect(service.recognize([action('bank_opened', 0), action('transfer_opened', 100)], catalog())).toMatchObject({
       status: 'no_match',
       recognitions: [],
+      compositeRecognitions: [],
       riskSignals: [],
     });
   });

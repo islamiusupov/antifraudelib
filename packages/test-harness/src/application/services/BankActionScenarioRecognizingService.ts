@@ -3,15 +3,20 @@ import type { ParsedScenarioCatalogEntity } from '@deepcode/antifraud-scenario-c
 import type { BankActionEntity } from '../../domain/entities/BankActionEntity';
 import type { ScenarioRecognitionEntity } from '../../domain/entities/ScenarioRecognitionEntity';
 import type { ScenarioRecognitionResultEntity } from '../../domain/entities/ScenarioRecognitionResultEntity';
+import { CompositeScenarioRecognizingService } from './CompositeScenarioRecognizingService';
 
 export class BankActionScenarioRecognizingService {
+  constructor(private readonly compositeScenarioRecognizingService = new CompositeScenarioRecognizingService()) {}
+
   recognize(actions: BankActionEntity[], catalog: ParsedScenarioCatalogEntity): ScenarioRecognitionResultEntity {
     const recognitions = this.recognizeFactors(actions, catalog);
+    const compositeRecognitions = this.compositeScenarioRecognizingService.recognize(recognitions, catalog);
 
     return {
-      status: recognitions.length > 0 ? 'recognized' : 'no_match',
+      status: recognitions.length > 0 || compositeRecognitions.length > 0 ? 'recognized' : 'no_match',
       target: 'd-bank',
       recognitions,
+      compositeRecognitions,
       riskSignals: recognitions.map((recognition) => this.toRiskSignal(recognition)),
     };
   }

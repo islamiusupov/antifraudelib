@@ -1,7 +1,10 @@
 export type { BankActionEntity } from './domain/entities/BankActionEntity';
+export type { CompositeScenarioRecognitionEntity } from './domain/entities/CompositeScenarioRecognitionEntity';
 export type { ScenarioRecognitionEntity } from './domain/entities/ScenarioRecognitionEntity';
 export type { ScenarioRecognitionResultEntity } from './domain/entities/ScenarioRecognitionResultEntity';
 export type { BankActionKind } from './domain/value-objects/BankActionKind';
 export type { ScenarioRecognitionStatus } from './domain/value-objects/ScenarioRecognitionStatus';
 export { BankActionScenarioRecognizingService } from './application/services/BankActionScenarioRecognizingService';
+export { CompositeScenarioRecognizingService } from './application/services/CompositeScenarioRecognizingService';
+export { CompositeScenarioTraceBuildingService } from './application/services/CompositeScenarioTraceBuildingService';
 export { ScenarioTraceBuildingService } from './application/services/ScenarioTraceBuildingService';
