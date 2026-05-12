@@ -10,6 +10,7 @@ describe('DBankWorkbench', () => {
     expect(markup).toContain('src="/d-bank/index.html"');
     expect(markup).toContain('title="D-bank demo"');
     expect(markup).toContain('deepfraud-demo-workbench__result');
+    expect(markup).toContain('data-dbank-event-count="0"');
     expect(markup).toContain('data-decision="step_up"');
     expect(markup).toContain('copy_paste_recipient');
     expect(markup).toContain('new_recipient_in_cooldown');

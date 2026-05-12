@@ -66,8 +66,32 @@ describe('DBankLiveFactorExtractingService', () => {
       },
     ]);
   });
+
+  it('extracts bridge risk signals added by D-bank 0.2.1', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('recipient_created', 100),
+        event('visual_challenge_started', 200),
+        event('keystroke_anomaly_observed', 300),
+        event('phishing_text_observed', 400),
+        event('server_factor_observed', 500, { factor: 'amount_anomaly' }),
+      ]).map((signal) => signal.kind),
+    ).toEqual([
+      'new_recipient',
+      'visual_challenge',
+      'keystroke_dynamics',
+      'phishing_text_dom',
+      'amount_anomaly',
+    ]);
+  });
 });
 
-function event(kind: DBankObservedEventEntity['kind'], atMs: number): DBankObservedEventEntity {
-  return { kind, atMs };
+function event(
+  kind: DBankObservedEventEntity['kind'],
+  atMs: number,
+  metadata?: DBankObservedEventEntity['metadata'],
+): DBankObservedEventEntity {
+  return { kind, atMs, metadata };
 }
