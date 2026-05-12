@@ -1,5 +1,5 @@
 import type { RiskSignalEntity } from '@deepcode/antifraud-core';
-import type { KeystrokeDynamicsInputEntity } from '../../domain/entities/KeystrokeDynamicsInputEntity';
+import type { KeystrokeDynamicsInputEntity } from '../../domain/ml/entities/KeystrokeDynamicsInputEntity';
 import { KeystrokeDynamicsFeatureVectorBuildingService } from './KeystrokeDynamicsFeatureVectorBuildingService';
 import { KeystrokeDynamicsModelScoringService } from './KeystrokeDynamicsModelScoringService';
 

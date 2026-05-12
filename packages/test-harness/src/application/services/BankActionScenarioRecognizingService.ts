@@ -1,8 +1,8 @@
 import type { RiskFactorKind, RiskSignalEntity } from '@deepcode/antifraud-core';
 import type { ParsedScenarioCatalogEntity } from '@deepcode/antifraud-scenario-catalog';
-import type { BankActionEntity } from '../../domain/entities/BankActionEntity';
-import type { ScenarioRecognitionEntity } from '../../domain/entities/ScenarioRecognitionEntity';
-import type { ScenarioRecognitionResultEntity } from '../../domain/entities/ScenarioRecognitionResultEntity';
+import type { BankActionEntity } from '../../domain/harness/entities/BankActionEntity';
+import type { ScenarioRecognitionEntity } from '../../domain/harness/entities/ScenarioRecognitionEntity';
+import type { ScenarioRecognitionResultEntity } from '../../domain/harness/entities/ScenarioRecognitionResultEntity';
 import { CompositeScenarioRecognizingService } from './CompositeScenarioRecognizingService';
 
 export class BankActionScenarioRecognizingService {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BrowserApiRiskFactorBuildingService } from '../../../src/application/services/BrowserApiRiskFactorBuildingService';
-import type { BrowserApiInterceptionEventEntity } from '../../../src/domain/entities/BrowserApiInterceptionEventEntity';
+import type { BrowserApiInterceptionEventEntity } from '../../../src/domain/browser/entities/BrowserApiInterceptionEventEntity';
 
 describe('BrowserApiRiskFactorBuildingService', () => {
   it('builds Layer 2 factors from media, clipboard OTP, and token exfiltration events', () => {

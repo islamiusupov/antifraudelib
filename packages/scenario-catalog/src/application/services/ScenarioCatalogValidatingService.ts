@@ -1,6 +1,6 @@
-﻿import { SCENARIO_GROUPS } from '../../domain/constants/ScenarioGroups';
-import type { ParsedScenarioCatalogEntity } from '../../domain/entities/ParsedScenarioCatalogEntity';
-import type { ScenarioCatalogValidationEntity } from '../../domain/entities/ScenarioCatalogValidationEntity';
+import { SCENARIO_GROUPS } from '../../domain/constants/ScenarioGroups';
+import type { ParsedScenarioCatalogEntity } from '../../domain/scenario/entities/ParsedScenarioCatalogEntity';
+import type { ScenarioCatalogValidationEntity } from '../../domain/scenario/entities/ScenarioCatalogValidationEntity';
 import { ScenarioIdBuildingService } from './ScenarioIdBuildingService';
 
 export class ScenarioCatalogValidatingService {

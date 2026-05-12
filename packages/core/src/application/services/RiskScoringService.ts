@@ -1,10 +1,10 @@
-import type { FactorContributionEntity } from '../../domain/entities/FactorContributionEntity';
+import type { FactorContributionEntity } from '../../domain/risk/entities/FactorContributionEntity';
 import { DEFAULT_AGGREGATION_LIMIT } from '../../domain/constants/RiskScoringAggregation';
-import type { RiskAssessmentEntity } from '../../domain/entities/RiskAssessmentEntity';
-import type { RiskFactorEntity } from '../../domain/entities/RiskFactorEntity';
+import type { RiskAssessmentEntity } from '../../domain/risk/entities/RiskAssessmentEntity';
+import type { RiskFactorEntity } from '../../domain/risk/entities/RiskFactorEntity';
 import type { RiskFactorStatus } from '../../domain/value-objects/RiskFactorStatus';
-import type { RiskReasonEntity } from '../../domain/entities/RiskReasonEntity';
-import type { RiskScoringRequestEntity } from '../../domain/entities/RiskScoringRequestEntity';
+import type { RiskReasonEntity } from '../../domain/risk/entities/RiskReasonEntity';
+import type { RiskScoringRequestEntity } from '../../domain/risk/entities/RiskScoringRequestEntity';
 import { RiskThresholdResolvingService } from './RiskThresholdResolvingService';
 
 export class RiskScoringService {

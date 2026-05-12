@@ -1,5 +1,5 @@
 import { FactorContributionBuildingService, type RiskFactorEntity, type RiskFactorStatus } from '@deepcode/antifraud-core';
-import type { BotDetectionCollectionEntity } from '../../domain/entities/BotDetectionCollectionEntity';
+import type { BotDetectionCollectionEntity } from '../../domain/bot/entities/BotDetectionCollectionEntity';
 
 export class BotDetectionRiskFactorBuildingService {
   constructor(private readonly factorContributionBuildingService = new FactorContributionBuildingService()) {}

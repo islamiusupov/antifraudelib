@@ -1,6 +1,6 @@
-﻿import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { ScenarioCatalogQueryingService } from '../../../src/application/services/ScenarioCatalogQueryingService';
-import type { ParsedScenarioCatalogEntity } from '../../../src/domain/entities/ParsedScenarioCatalogEntity';
+import type { ParsedScenarioCatalogEntity } from '../../../src/domain/scenario/entities/ParsedScenarioCatalogEntity';
 
 describe('ScenarioCatalogQueryingService', () => {
   it('returns a scenario by id', () => {

@@ -3,7 +3,7 @@ import { join } from 'path';
 import { describe, expect, it } from 'vitest';
 import { ScenarioCatalogParsingService } from '@deepcode/antifraud-scenario-catalog';
 import { BankActionScenarioRecognizingService } from '../../../src/application/services/BankActionScenarioRecognizingService';
-import type { BankActionEntity } from '../../../src/domain/entities/BankActionEntity';
+import type { BankActionEntity } from '../../../src/domain/harness/entities/BankActionEntity';
 
 describe('BankActionScenarioRecognizingService', () => {
   it('recognizes copy-paste recipient scenarios from D-bank action traces', () => {

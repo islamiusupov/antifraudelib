@@ -1,5 +1,5 @@
-import type { BotDetectionCollectionConfigEntity } from '../../domain/entities/BotDetectionCollectionConfigEntity';
-import type { BotDetectionCollectionEntity } from '../../domain/entities/BotDetectionCollectionEntity';
+import type { BotDetectionCollectionConfigEntity } from '../../domain/bot/entities/BotDetectionCollectionConfigEntity';
+import type { BotDetectionCollectionEntity } from '../../domain/bot/entities/BotDetectionCollectionEntity';
 
 type BotDetectionResultPort = {
   bot: boolean;

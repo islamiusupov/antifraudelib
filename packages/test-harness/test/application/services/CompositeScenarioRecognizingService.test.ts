@@ -5,8 +5,8 @@ import { ScenarioCatalogParsingService } from '@deepcode/antifraud-scenario-cata
 import { BankActionScenarioRecognizingService } from '../../../src/application/services/BankActionScenarioRecognizingService';
 import { CompositeScenarioRecognizingService } from '../../../src/application/services/CompositeScenarioRecognizingService';
 import { ScenarioTraceBuildingService } from '../../../src/application/services/ScenarioTraceBuildingService';
-import type { BankActionEntity } from '../../../src/domain/entities/BankActionEntity';
-import type { ScenarioRecognitionEntity } from '../../../src/domain/entities/ScenarioRecognitionEntity';
+import type { BankActionEntity } from '../../../src/domain/harness/entities/BankActionEntity';
+import type { ScenarioRecognitionEntity } from '../../../src/domain/harness/entities/ScenarioRecognitionEntity';
 
 describe('CompositeScenarioRecognizingService', () => {
   it('recognizes C1 when bank actions contain every required PRD factor', () => {

@@ -1,6 +1,6 @@
 import { useContext } from 'react';
 import { DeepFraudContext } from '../context/DeepFraudContext';
-import type { DeepFraudContextValueEntity } from '../../domain/entities/DeepFraudContextValueEntity';
+import type { DeepFraudContextValueEntity } from '../../domain/common/entities/DeepFraudContextValueEntity';
 
 export function useDeepFraud(): DeepFraudContextValueEntity {
   const context = useContext(DeepFraudContext);

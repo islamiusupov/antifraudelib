@@ -3,8 +3,8 @@ import {
   PHISHING_URL_MODEL_THRESHOLD,
   PHISHING_URL_MODEL_WEIGHTS,
 } from '../../domain/constants/PhishingUrlModelWeights';
-import type { MlModelScoreEntity } from '../../domain/entities/MlModelScoreEntity';
-import type { PhishingUrlFeatureVectorEntity } from '../../domain/entities/PhishingUrlFeatureVectorEntity';
+import type { MlModelScoreEntity } from '../../domain/ml/entities/MlModelScoreEntity';
+import type { PhishingUrlFeatureVectorEntity } from '../../domain/ml/entities/PhishingUrlFeatureVectorEntity';
 
 export class PhishingUrlModelScoringService {
   score(features: PhishingUrlFeatureVectorEntity): MlModelScoreEntity {

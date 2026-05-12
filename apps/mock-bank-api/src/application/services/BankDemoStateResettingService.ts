@@ -1,4 +1,4 @@
-﻿import type { BankDemoStateEntity } from '../../domain/entities/BankDemoStateEntity';
+import type { BankDemoStateEntity } from '../../domain/bank/entities/BankDemoStateEntity';
 
 export class BankDemoStateResettingService {
   reset(): BankDemoStateEntity {

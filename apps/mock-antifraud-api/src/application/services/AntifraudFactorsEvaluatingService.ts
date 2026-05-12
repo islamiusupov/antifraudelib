@@ -1,6 +1,6 @@
-﻿import { SERVER_SIDE_FACTOR_KINDS } from '../../domain/constants/ServerSideFactorKinds';
-import type { FactorEvaluationRequestEntity } from '../../domain/entities/FactorEvaluationRequestEntity';
-import type { FactorEvaluationResponseEntity, FactorResultEntity } from '../../domain/entities/FactorEvaluationResponseEntity';
+import { SERVER_SIDE_FACTOR_KINDS } from '../../domain/constants/ServerSideFactorKinds';
+import type { FactorEvaluationRequestEntity } from '../../domain/antifraud/entities/FactorEvaluationRequestEntity';
+import type { FactorEvaluationResponseEntity, FactorResultEntity } from '../../domain/antifraud/entities/FactorEvaluationResponseEntity';
 
 export class AntifraudFactorsEvaluatingService {
   evaluate(request: FactorEvaluationRequestEntity): FactorEvaluationResponseEntity {

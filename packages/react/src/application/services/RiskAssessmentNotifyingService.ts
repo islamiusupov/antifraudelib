@@ -1,5 +1,5 @@
 import type { RiskAssessmentEntity } from '@deepcode/antifraud-core';
-import type { RiskAssessmentNotificationCallbacksEntity } from '../../domain/entities/RiskAssessmentNotificationCallbacksEntity';
+import type { RiskAssessmentNotificationCallbacksEntity } from '../../domain/common/entities/RiskAssessmentNotificationCallbacksEntity';
 
 export class RiskAssessmentNotifyingService {
   notify(

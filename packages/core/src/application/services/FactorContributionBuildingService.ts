@@ -1,7 +1,7 @@
 import { RISK_FACTOR_DEFINITIONS } from '../../domain/constants/RiskFactorDefinitions';
-import type { FactorDefinitionEntity } from '../../domain/entities/FactorDefinitionEntity';
-import type { RiskFactorEntity } from '../../domain/entities/RiskFactorEntity';
-import type { RiskSignalEntity } from '../../domain/entities/RiskSignalEntity';
+import type { FactorDefinitionEntity } from '../../domain/risk/entities/FactorDefinitionEntity';
+import type { RiskFactorEntity } from '../../domain/risk/entities/RiskFactorEntity';
+import type { RiskSignalEntity } from '../../domain/risk/entities/RiskSignalEntity';
 
 export class FactorContributionBuildingService {
   private readonly definitionsByKind = new Map<string, FactorDefinitionEntity>(

@@ -1,5 +1,5 @@
 import type { RiskFactorEntity } from '@deepcode/antifraud-core';
-import type { SessionSignalCollectionConfigEntity } from '../../domain/entities/SessionSignalCollectionConfigEntity';
+import type { SessionSignalCollectionConfigEntity } from '../../domain/session/entities/SessionSignalCollectionConfigEntity';
 import { BotDetectionCollectingService } from './BotDetectionCollectingService';
 import { BotDetectionRiskFactorBuildingService } from './BotDetectionRiskFactorBuildingService';
 import { DeviceFingerprintCollectingService } from './DeviceFingerprintCollectingService';

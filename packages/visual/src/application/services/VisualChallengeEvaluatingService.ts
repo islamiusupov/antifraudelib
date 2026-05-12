@@ -1,6 +1,6 @@
 import type { RiskSignalEntity } from '@deepcode/antifraud-core';
-import type { VisualChallengeDecisionEntity } from '../../domain/entities/VisualChallengeDecisionEntity';
-import type { VisualChallengeFrameEntity } from '../../domain/entities/VisualChallengeFrameEntity';
+import type { VisualChallengeDecisionEntity } from '../../domain/challenge/entities/VisualChallengeDecisionEntity';
+import type { VisualChallengeFrameEntity } from '../../domain/challenge/entities/VisualChallengeFrameEntity';
 
 export class VisualChallengeEvaluatingService {
   evaluate(frame: VisualChallengeFrameEntity): VisualChallengeDecisionEntity {

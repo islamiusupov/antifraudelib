@@ -1,5 +1,5 @@
-import type { KeystrokeDynamicsFeatureVectorEntity } from '../../domain/entities/KeystrokeDynamicsFeatureVectorEntity';
-import type { KeystrokeDynamicsInputEntity } from '../../domain/entities/KeystrokeDynamicsInputEntity';
+import type { KeystrokeDynamicsFeatureVectorEntity } from '../../domain/ml/entities/KeystrokeDynamicsFeatureVectorEntity';
+import type { KeystrokeDynamicsInputEntity } from '../../domain/ml/entities/KeystrokeDynamicsInputEntity';
 
 export class KeystrokeDynamicsFeatureVectorBuildingService {
   build(input: KeystrokeDynamicsInputEntity): KeystrokeDynamicsFeatureVectorEntity {

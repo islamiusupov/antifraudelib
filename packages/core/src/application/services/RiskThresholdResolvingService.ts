@@ -1,5 +1,5 @@
 import { DEFAULT_RISK_DECISION_THRESHOLDS } from '../../domain/constants/RiskDecisionThresholds';
-import type { DecisionThresholdsEntity } from '../../domain/entities/DecisionThresholdsEntity';
+import type { DecisionThresholdsEntity } from '../../domain/risk/entities/DecisionThresholdsEntity';
 import type { RiskDecisionLevel } from '../../domain/value-objects/RiskDecisionLevel';
 
 export class RiskThresholdResolvingService {

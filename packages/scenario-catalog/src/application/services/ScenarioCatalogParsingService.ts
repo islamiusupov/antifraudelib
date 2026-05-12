@@ -1,8 +1,8 @@
-﻿import { SCENARIO_GROUPS } from '../../domain/constants/ScenarioGroups';
-import type { CatalogScenarioEntity } from '../../domain/entities/CatalogScenarioEntity';
-import type { CompositeScenarioEntity } from '../../domain/entities/CompositeScenarioEntity';
-import type { ParsedScenarioCatalogEntity } from '../../domain/entities/ParsedScenarioCatalogEntity';
-import type { ScenarioGroupEntity } from '../../domain/entities/ScenarioGroupEntity';
+import { SCENARIO_GROUPS } from '../../domain/constants/ScenarioGroups';
+import type { CatalogScenarioEntity } from '../../domain/scenario/entities/CatalogScenarioEntity';
+import type { CompositeScenarioEntity } from '../../domain/scenario/entities/CompositeScenarioEntity';
+import type { ParsedScenarioCatalogEntity } from '../../domain/scenario/entities/ParsedScenarioCatalogEntity';
+import type { ScenarioGroupEntity } from '../../domain/scenario/entities/ScenarioGroupEntity';
 import type { ScenarioType } from '../../domain/value-objects/ScenarioType';
 import { MarkdownTableRowParsingService } from './MarkdownTableRowParsingService';
 import { ScenarioIdBuildingService } from './ScenarioIdBuildingService';

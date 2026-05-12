@@ -1,5 +1,5 @@
-import type { DeviceFingerprintCollectionConfigEntity } from '../../domain/entities/DeviceFingerprintCollectionConfigEntity';
-import type { DeviceFingerprintCollectionEntity } from '../../domain/entities/DeviceFingerprintCollectionEntity';
+import type { DeviceFingerprintCollectionConfigEntity } from '../../domain/fingerprint/entities/DeviceFingerprintCollectionConfigEntity';
+import type { DeviceFingerprintCollectionEntity } from '../../domain/fingerprint/entities/DeviceFingerprintCollectionEntity';
 
 type ThumbmarkResult = string | Record<string, unknown>;
 

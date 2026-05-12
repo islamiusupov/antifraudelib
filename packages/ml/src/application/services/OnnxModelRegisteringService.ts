@@ -1,4 +1,4 @@
-import type { OnnxModelDefinitionEntity } from '../../domain/entities/OnnxModelDefinitionEntity';
+import type { OnnxModelDefinitionEntity } from '../../domain/ml/entities/OnnxModelDefinitionEntity';
 
 export class OnnxModelRegisteringService {
   list(): OnnxModelDefinitionEntity[] {

@@ -11,6 +11,7 @@ function runArchitectureCheck(root = ROOT) {
 
   ensureNoTestsInSrc(files, errors);
   ensureNoDtoDirectory(root, errors);
+  ensureNoFlatDomainEntitiesDirectory(root, errors);
   ensureEntityNaming(files, errors);
   ensureSourceFilesHaveMirroredTests(files, errors);
   ensureServiceNaming(files, errors);
@@ -77,10 +78,23 @@ function listDirectories(root) {
   return directories;
 }
 
+function ensureNoFlatDomainEntitiesDirectory(root, errors) {
+  for (const relativeRoot of CHECK_ROOTS) {
+    const absoluteRoot = path.join(root, relativeRoot);
+    if (!fs.existsSync(absoluteRoot)) continue;
+    for (const directory of listDirectories(absoluteRoot)) {
+      const normalized = normalize(directory);
+      if (normalized.includes('/src/domain/entities')) {
+        errors.push(`Domain entities must be grouped under domain/<area>/entities: ${relative(directory)}`);
+      }
+    }
+  }
+}
+
 function ensureEntityNaming(files, errors) {
   for (const file of files) {
     const normalized = normalize(file);
-    if (!normalized.includes('/src/domain/entities/')) continue;
+    if (!isDomainEntityFile(normalized)) continue;
     if (!/\.[tj]sx?$/.test(normalized)) continue;
 
     const basename = path.basename(file).replace(/\.[tj]sx?$/, '');
@@ -107,7 +121,7 @@ function ensureSourceFilesHaveMirroredTests(files, errors) {
     if (!/\.[tj]sx?$/.test(normalized)) continue;
     if (/\.test\.[tj]sx?$/.test(normalized)) continue;
     if (normalized.endsWith('/index.ts') || normalized.endsWith('/index.tsx')) continue;
-    if (normalized.includes('/domain/entities/') || normalized.includes('/domain/value-objects/')) continue;
+    if (isDomainEntityFile(normalized) || normalized.includes('/domain/value-objects/')) continue;
     if (normalized.includes('/domain/constants/')) continue;
 
     const expectedTest = normalized
@@ -121,6 +135,10 @@ function ensureSourceFilesHaveMirroredTests(files, errors) {
       errors.push(`Missing mirrored test for ${relative(file)}. Expected ${relative(expectedTest)}`);
     }
   }
+}
+
+function isDomainEntityFile(normalized) {
+  return normalized.includes('/src/domain/') && normalized.includes('/entities/');
 }
 
 function ensureServiceNaming(files, errors) {

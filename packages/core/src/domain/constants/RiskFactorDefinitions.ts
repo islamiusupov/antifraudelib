@@ -1,4 +1,4 @@
-import type { FactorDefinitionEntity } from '../entities/FactorDefinitionEntity';
+import type { FactorDefinitionEntity } from '../risk/entities/FactorDefinitionEntity';
 
 export const RISK_FACTOR_DEFINITIONS: FactorDefinitionEntity[] = [
   { kind: 'copy_paste_recipient', maxContribution: 40, source: 'live', tier: 'LIVE' },

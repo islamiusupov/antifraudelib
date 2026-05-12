@@ -1,5 +1,5 @@
-import type { RiskFactorEntity } from '../../domain/entities/RiskFactorEntity';
-import type { ServerFactorEvaluationEntity } from '../../domain/entities/ServerFactorEvaluationEntity';
+import type { RiskFactorEntity } from '../../domain/risk/entities/RiskFactorEntity';
+import type { ServerFactorEvaluationEntity } from '../../domain/risk/entities/ServerFactorEvaluationEntity';
 
 export class ServerFactorEvaluationAdaptingService {
   adapt(evaluations: ServerFactorEvaluationEntity[]): RiskFactorEntity[] {

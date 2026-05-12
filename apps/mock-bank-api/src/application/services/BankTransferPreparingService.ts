@@ -1,6 +1,6 @@
-﻿import type { BankDemoStateEntity } from '../../domain/entities/BankDemoStateEntity';
-import type { TransferPrepareRequestEntity } from '../../domain/entities/TransferPrepareRequestEntity';
-import type { TransferPrepareResponseEntity } from '../../domain/entities/TransferPrepareResponseEntity';
+import type { BankDemoStateEntity } from '../../domain/bank/entities/BankDemoStateEntity';
+import type { TransferPrepareRequestEntity } from '../../domain/bank/entities/TransferPrepareRequestEntity';
+import type { TransferPrepareResponseEntity } from '../../domain/bank/entities/TransferPrepareResponseEntity';
 
 export type BankTransferPreparingResult = {
   state: BankDemoStateEntity;

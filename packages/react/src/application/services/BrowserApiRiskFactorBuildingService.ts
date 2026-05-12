@@ -1,5 +1,5 @@
 import { FactorContributionBuildingService, type RiskFactorEntity, type RiskSignalEntity } from '@deepcode/antifraud-core';
-import type { BrowserApiInterceptionEventEntity } from '../../domain/entities/BrowserApiInterceptionEventEntity';
+import type { BrowserApiInterceptionEventEntity } from '../../domain/browser/entities/BrowserApiInterceptionEventEntity';
 
 export class BrowserApiRiskFactorBuildingService {
   constructor(private readonly factorContributionBuildingService = new FactorContributionBuildingService()) {}

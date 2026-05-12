@@ -1,5 +1,5 @@
 import type { RiskSignalEntity } from '@deepcode/antifraud-core';
-import type { DBankObservedEventEntity } from '../../domain/entities/DBankObservedEventEntity';
+import type { DBankObservedEventEntity } from '../../domain/dbank/entities/DBankObservedEventEntity';
 
 export class DBankLiveFactorExtractingService {
   extract(events: DBankObservedEventEntity[]): RiskSignalEntity[] {

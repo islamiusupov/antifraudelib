@@ -1,9 +1,9 @@
-export type { KeystrokeDynamicsInputEntity } from './domain/entities/KeystrokeDynamicsInputEntity';
-export type { KeystrokeDynamicsFeatureVectorEntity } from './domain/entities/KeystrokeDynamicsFeatureVectorEntity';
-export type { MlModelScoreEntity } from './domain/entities/MlModelScoreEntity';
-export type { OnnxModelDefinitionEntity } from './domain/entities/OnnxModelDefinitionEntity';
-export type { PhishingUrlFeatureVectorEntity } from './domain/entities/PhishingUrlFeatureVectorEntity';
-export type { PhishingUrlInputEntity } from './domain/entities/PhishingUrlInputEntity';
+export type { KeystrokeDynamicsInputEntity } from './domain/ml/entities/KeystrokeDynamicsInputEntity';
+export type { KeystrokeDynamicsFeatureVectorEntity } from './domain/ml/entities/KeystrokeDynamicsFeatureVectorEntity';
+export type { MlModelScoreEntity } from './domain/ml/entities/MlModelScoreEntity';
+export type { OnnxModelDefinitionEntity } from './domain/ml/entities/OnnxModelDefinitionEntity';
+export type { PhishingUrlFeatureVectorEntity } from './domain/ml/entities/PhishingUrlFeatureVectorEntity';
+export type { PhishingUrlInputEntity } from './domain/ml/entities/PhishingUrlInputEntity';
 export type { MlFallbackKind } from './domain/value-objects/MlFallbackKind';
 export type { MlRuntimeKind } from './domain/value-objects/MlRuntimeKind';
 export { KeystrokeDynamicsClassifyingService } from './application/services/KeystrokeDynamicsClassifyingService';

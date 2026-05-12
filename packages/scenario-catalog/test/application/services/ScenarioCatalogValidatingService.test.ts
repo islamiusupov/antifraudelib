@@ -1,7 +1,7 @@
-﻿import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { ScenarioCatalogValidatingService } from '../../../src/application/services/ScenarioCatalogValidatingService';
 import { ScenarioIdBuildingService } from '../../../src/application/services/ScenarioIdBuildingService';
-import type { ParsedScenarioCatalogEntity } from '../../../src/domain/entities/ParsedScenarioCatalogEntity';
+import type { ParsedScenarioCatalogEntity } from '../../../src/domain/scenario/entities/ParsedScenarioCatalogEntity';
 
 describe('ScenarioCatalogValidatingService', () => {
   it('accepts a complete catalog with all expected scenario ids and ten composites', () => {

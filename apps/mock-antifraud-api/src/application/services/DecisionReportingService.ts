@@ -1,5 +1,5 @@
-﻿import type { AntifraudDecisionReportEntity } from '../../domain/entities/AntifraudDecisionReportEntity';
-import type { DecisionReportResultEntity } from '../../domain/entities/DecisionReportResultEntity';
+import type { AntifraudDecisionReportEntity } from '../../domain/antifraud/entities/AntifraudDecisionReportEntity';
+import type { DecisionReportResultEntity } from '../../domain/antifraud/entities/DecisionReportResultEntity';
 
 export class DecisionReportingService {
   report(decisionReport: AntifraudDecisionReportEntity): DecisionReportResultEntity {

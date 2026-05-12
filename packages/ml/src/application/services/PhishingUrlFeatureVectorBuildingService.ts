@@ -1,5 +1,5 @@
-import type { PhishingUrlFeatureVectorEntity } from '../../domain/entities/PhishingUrlFeatureVectorEntity';
-import type { PhishingUrlInputEntity } from '../../domain/entities/PhishingUrlInputEntity';
+import type { PhishingUrlFeatureVectorEntity } from '../../domain/ml/entities/PhishingUrlFeatureVectorEntity';
+import type { PhishingUrlInputEntity } from '../../domain/ml/entities/PhishingUrlInputEntity';
 
 const SUSPICIOUS_TOKENS = ['safe-account', 'secure-account', 'central-bank', 'verify', 'otp', 'cbr'];
 const RISKY_TLDS = ['tk', 'ml', 'ga', 'cf', 'gq'];

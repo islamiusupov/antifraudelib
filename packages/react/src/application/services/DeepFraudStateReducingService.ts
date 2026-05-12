@@ -1,7 +1,7 @@
 import type { RiskFactorEntity, RiskScope } from '@deepcode/antifraud-core';
 import { RiskScoringService } from '@deepcode/antifraud-core';
-import type { DeepFraudRootConfigEntity } from '../../domain/entities/DeepFraudRootConfigEntity';
-import type { DeepFraudStateEntity } from '../../domain/entities/DeepFraudStateEntity';
+import type { DeepFraudRootConfigEntity } from '../../domain/common/entities/DeepFraudRootConfigEntity';
+import type { DeepFraudStateEntity } from '../../domain/common/entities/DeepFraudStateEntity';
 
 export class DeepFraudStateReducingService {
   private readonly riskScoringService = new RiskScoringService();

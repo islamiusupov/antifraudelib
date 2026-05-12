@@ -1,4 +1,4 @@
-﻿import type { ScenarioGroupEntity } from '../entities/ScenarioGroupEntity';
+import type { ScenarioGroupEntity } from '../scenario/entities/ScenarioGroupEntity';
 
 export const SCENARIO_GROUPS: ScenarioGroupEntity[] = [
   { factor: 'copy_paste_recipient', prefix: 'CPY', kind: 'factor', tier: 'LIVE', expectedCount: 20 },

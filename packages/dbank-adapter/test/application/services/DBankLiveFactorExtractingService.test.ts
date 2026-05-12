@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DBankLiveFactorExtractingService } from '../../../src/application/services/DBankLiveFactorExtractingService';
-import type { DBankObservedEventEntity } from '../../../src/domain/entities/DBankObservedEventEntity';
+import type { DBankObservedEventEntity } from '../../../src/domain/dbank/entities/DBankObservedEventEntity';
 
 describe('DBankLiveFactorExtractingService', () => {
   it('extracts copy-paste recipient and concurrent media live signals', () => {

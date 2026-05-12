@@ -1,5 +1,5 @@
-﻿import type { RecallQuestionRequestEntity } from '../../domain/entities/RecallQuestionRequestEntity';
-import type { RecallQuestionResponseEntity } from '../../domain/entities/RecallQuestionResponseEntity';
+import type { RecallQuestionRequestEntity } from '../../domain/antifraud/entities/RecallQuestionRequestEntity';
+import type { RecallQuestionResponseEntity } from '../../domain/antifraud/entities/RecallQuestionResponseEntity';
 
 export class RecallQuestionGeneratingService {
   generate(

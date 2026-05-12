@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { DBankBridgeMessageParsingService, type DBankObservedEventEntity } from '@deepcode/antifraud-dbank-adapter';
 import { DecisionBadge, DeepFraud, DeepFraudRoot, ReasonCodeList, RiskFactorList, RiskMeter, VisualChallengeGate } from '@deepcode/antifraud-react';
 import { DBankEventRiskFactorsBuildingService } from '../../application/services/DBankEventRiskFactorsBuildingService';
-import type { DemoWorkbenchConfigEntity } from '../../domain/entities/DemoWorkbenchConfigEntity';
+import type { DemoWorkbenchConfigEntity } from '../../domain/demo/entities/DemoWorkbenchConfigEntity';
 
 export type DBankWorkbenchProps = {
   config: DemoWorkbenchConfigEntity;

@@ -1,6 +1,6 @@
 import type { CatalogScenarioEntity, CompositeScenarioEntity, ParsedScenarioCatalogEntity } from '@deepcode/antifraud-scenario-catalog';
-import type { CompositeScenarioRecognitionEntity } from '../../domain/entities/CompositeScenarioRecognitionEntity';
-import type { ScenarioRecognitionEntity } from '../../domain/entities/ScenarioRecognitionEntity';
+import type { CompositeScenarioRecognitionEntity } from '../../domain/harness/entities/CompositeScenarioRecognitionEntity';
+import type { ScenarioRecognitionEntity } from '../../domain/harness/entities/ScenarioRecognitionEntity';
 
 export class CompositeScenarioRecognizingService {
   recognize(

@@ -1,6 +1,6 @@
 import { DBankStaticAssetsLocatingService } from '@deepcode/antifraud-dbank-adapter';
 import type { RiskFactorEntity } from '@deepcode/antifraud-core';
-import type { DemoWorkbenchConfigEntity } from '../../domain/entities/DemoWorkbenchConfigEntity';
+import type { DemoWorkbenchConfigEntity } from '../../domain/demo/entities/DemoWorkbenchConfigEntity';
 
 export type DemoWorkbenchConfigBuildOptions = {
   userId?: string;

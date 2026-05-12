@@ -47,7 +47,7 @@ describe('check-architecture', () => {
 
   it('rejects entity files and exports without Entity suffix', () => {
     const root = createTempProject({
-      'packages/example/src/domain/entities/BankAccount.ts': 'export type BankAccount = {}',
+      'packages/example/src/domain/bank/entities/BankAccount.ts': 'export type BankAccount = {}',
     });
 
     expect(runArchitectureCheck(root)).toEqual(
@@ -58,9 +58,21 @@ describe('check-architecture', () => {
     );
   });
 
+  it('rejects flat domain entity directories', () => {
+    const root = createTempProject({
+      'packages/example/src/domain/entities/BankAccountEntity.ts': 'export type BankAccountEntity = {}',
+    });
+
+    expect(runArchitectureCheck(root)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Domain entities must be grouped under domain/<area>/entities'),
+      ]),
+    );
+  });
+
   it('rejects domain imports from outer layers and D-bank references in react package', () => {
     const root = createTempProject({
-      'packages/example/src/domain/entities/FraudEntity.ts': "import '../application/services/BadService';",
+      'packages/example/src/domain/risk/entities/FraudEntity.ts': "import '../../application/services/BadService';",
       'packages/react/src/application/services/RiskScoringService.ts': "import 'd-bank';",
       'packages/react/test/application/services/RiskScoringService.test.ts': '',
     });

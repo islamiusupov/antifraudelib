@@ -1,5 +1,5 @@
-﻿import { SERVER_SIDE_FACTOR_KINDS } from '../../domain/constants/ServerSideFactorKinds';
-import type { HealthStatusEntity } from '../../domain/entities/HealthStatusEntity';
+import { SERVER_SIDE_FACTOR_KINDS } from '../../domain/constants/ServerSideFactorKinds';
+import type { HealthStatusEntity } from '../../domain/antifraud/entities/HealthStatusEntity';
 
 export class HealthCheckingService {
   check(): HealthStatusEntity {

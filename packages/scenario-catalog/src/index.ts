@@ -1,9 +1,9 @@
-﻿export { SCENARIO_GROUPS } from './domain/constants/ScenarioGroups';
-export type { CatalogScenarioEntity } from './domain/entities/CatalogScenarioEntity';
-export type { CompositeScenarioEntity } from './domain/entities/CompositeScenarioEntity';
-export type { ParsedScenarioCatalogEntity } from './domain/entities/ParsedScenarioCatalogEntity';
-export type { ScenarioCatalogValidationEntity } from './domain/entities/ScenarioCatalogValidationEntity';
-export type { ScenarioGroupEntity } from './domain/entities/ScenarioGroupEntity';
+export { SCENARIO_GROUPS } from './domain/constants/ScenarioGroups';
+export type { CatalogScenarioEntity } from './domain/scenario/entities/CatalogScenarioEntity';
+export type { CompositeScenarioEntity } from './domain/scenario/entities/CompositeScenarioEntity';
+export type { ParsedScenarioCatalogEntity } from './domain/scenario/entities/ParsedScenarioCatalogEntity';
+export type { ScenarioCatalogValidationEntity } from './domain/scenario/entities/ScenarioCatalogValidationEntity';
+export type { ScenarioGroupEntity } from './domain/scenario/entities/ScenarioGroupEntity';
 export type { ScenarioKind } from './domain/value-objects/ScenarioKind';
 export type { ScenarioTier } from './domain/value-objects/ScenarioTier';
 export type { ScenarioType } from './domain/value-objects/ScenarioType';

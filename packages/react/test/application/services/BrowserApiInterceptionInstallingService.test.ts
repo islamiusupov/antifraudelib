@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BrowserApiInterceptionInstallingService } from '../../../src/application/services/BrowserApiInterceptionInstallingService';
-import type { BrowserApiInterceptionEventEntity } from '../../../src/domain/entities/BrowserApiInterceptionEventEntity';
-import type { BrowserApiInterceptionTargetEntity } from '../../../src/domain/entities/BrowserApiInterceptionTargetEntity';
+import type { BrowserApiInterceptionEventEntity } from '../../../src/domain/browser/entities/BrowserApiInterceptionEventEntity';
+import type { BrowserApiInterceptionTargetEntity } from '../../../src/domain/browser/entities/BrowserApiInterceptionTargetEntity';
 
 describe('BrowserApiInterceptionInstallingService', () => {
   it('captures fetch requests and restores the original fetch on uninstall', async () => {

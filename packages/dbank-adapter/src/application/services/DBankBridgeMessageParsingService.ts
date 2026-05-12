@@ -1,4 +1,4 @@
-import type { DBankBridgeMessageEntity } from '../../domain/entities/DBankBridgeMessageEntity';
+import type { DBankBridgeMessageEntity } from '../../domain/dbank/entities/DBankBridgeMessageEntity';
 import type { DBankObservedEventKind } from '../../domain/value-objects/DBankObservedEventKind';
 
 const DBANK_OBSERVED_EVENT_KINDS: DBankObservedEventKind[] = [

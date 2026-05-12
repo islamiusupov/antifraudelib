@@ -1,5 +1,5 @@
 import type { CompositeScenarioEntity, ParsedScenarioCatalogEntity } from '@deepcode/antifraud-scenario-catalog';
-import type { BankActionEntity } from '../../domain/entities/BankActionEntity';
+import type { BankActionEntity } from '../../domain/harness/entities/BankActionEntity';
 import { ScenarioTraceBuildingService } from './ScenarioTraceBuildingService';
 
 export class CompositeScenarioTraceBuildingService {

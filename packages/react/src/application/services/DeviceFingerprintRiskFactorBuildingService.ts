@@ -1,5 +1,5 @@
 import { FactorContributionBuildingService, type RiskFactorEntity, type RiskFactorStatus } from '@deepcode/antifraud-core';
-import type { DeviceFingerprintCollectionEntity } from '../../domain/entities/DeviceFingerprintCollectionEntity';
+import type { DeviceFingerprintCollectionEntity } from '../../domain/fingerprint/entities/DeviceFingerprintCollectionEntity';
 
 export class DeviceFingerprintRiskFactorBuildingService {
   constructor(private readonly factorContributionBuildingService = new FactorContributionBuildingService()) {}

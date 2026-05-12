@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { DBankWorkbench } from '../../../src/presentation/components/DBankWorkbench';
-import type { DemoWorkbenchConfigEntity } from '../../../src/domain/entities/DemoWorkbenchConfigEntity';
+import type { DemoWorkbenchConfigEntity } from '../../../src/domain/demo/entities/DemoWorkbenchConfigEntity';
 
 describe('DBankWorkbench', () => {
   it('renders D-bank on the left and antifraud result UI on the right', () => {

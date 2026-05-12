@@ -3,8 +3,8 @@ import {
   KEYSTROKE_DYNAMICS_MODEL_THRESHOLD,
   KEYSTROKE_DYNAMICS_MODEL_WEIGHTS,
 } from '../../domain/constants/KeystrokeDynamicsModelWeights';
-import type { KeystrokeDynamicsFeatureVectorEntity } from '../../domain/entities/KeystrokeDynamicsFeatureVectorEntity';
-import type { MlModelScoreEntity } from '../../domain/entities/MlModelScoreEntity';
+import type { KeystrokeDynamicsFeatureVectorEntity } from '../../domain/ml/entities/KeystrokeDynamicsFeatureVectorEntity';
+import type { MlModelScoreEntity } from '../../domain/ml/entities/MlModelScoreEntity';
 
 export class KeystrokeDynamicsModelScoringService {
   score(features: KeystrokeDynamicsFeatureVectorEntity): MlModelScoreEntity {

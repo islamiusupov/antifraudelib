@@ -1,5 +1,5 @@
 import type { RiskSignalEntity } from '@deepcode/antifraud-core';
-import type { PhishingUrlInputEntity } from '../../domain/entities/PhishingUrlInputEntity';
+import type { PhishingUrlInputEntity } from '../../domain/ml/entities/PhishingUrlInputEntity';
 import { PhishingUrlFeatureVectorBuildingService } from './PhishingUrlFeatureVectorBuildingService';
 import { PhishingUrlModelScoringService } from './PhishingUrlModelScoringService';
 

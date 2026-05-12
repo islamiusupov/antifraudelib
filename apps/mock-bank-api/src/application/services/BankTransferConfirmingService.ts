@@ -1,6 +1,6 @@
-﻿import type { BankDemoStateEntity } from '../../domain/entities/BankDemoStateEntity';
-import type { BankTransactionEntity } from '../../domain/entities/BankTransactionEntity';
-import type { TransferConfirmResultEntity } from '../../domain/entities/TransferConfirmResultEntity';
+import type { BankDemoStateEntity } from '../../domain/bank/entities/BankDemoStateEntity';
+import type { BankTransactionEntity } from '../../domain/bank/entities/BankTransactionEntity';
+import type { TransferConfirmResultEntity } from '../../domain/bank/entities/TransferConfirmResultEntity';
 
 export type BankTransferConfirmingResult = {
   state: BankDemoStateEntity;

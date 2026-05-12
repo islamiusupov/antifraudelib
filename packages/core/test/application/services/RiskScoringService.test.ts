@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RiskScoringService } from '../../../src/application/services/RiskScoringService';
-import type { RiskFactorEntity } from '../../../src/domain/entities/RiskFactorEntity';
+import type { RiskFactorEntity } from '../../../src/domain/risk/entities/RiskFactorEntity';
 
 describe('RiskScoringService', () => {
   it('returns allow for low-risk factors below 30', () => {

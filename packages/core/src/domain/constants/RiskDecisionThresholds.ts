@@ -1,4 +1,4 @@
-import type { DecisionThresholdsEntity } from '../entities/DecisionThresholdsEntity';
+import type { DecisionThresholdsEntity } from '../risk/entities/DecisionThresholdsEntity';
 
 export const DEFAULT_RISK_DECISION_THRESHOLDS: DecisionThresholdsEntity = {
   monitor: 30,

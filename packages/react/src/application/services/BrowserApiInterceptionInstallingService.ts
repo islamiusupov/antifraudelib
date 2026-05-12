@@ -1,9 +1,9 @@
-import type { BrowserApiInterceptionConfigEntity } from '../../domain/entities/BrowserApiInterceptionConfigEntity';
-import type { BrowserApiInterceptionEventEntity } from '../../domain/entities/BrowserApiInterceptionEventEntity';
+import type { BrowserApiInterceptionConfigEntity } from '../../domain/browser/entities/BrowserApiInterceptionConfigEntity';
+import type { BrowserApiInterceptionEventEntity } from '../../domain/browser/entities/BrowserApiInterceptionEventEntity';
 import type {
   BrowserApiInterceptionTargetEntity,
   BrowserXmlHttpRequestEntity,
-} from '../../domain/entities/BrowserApiInterceptionTargetEntity';
+} from '../../domain/browser/entities/BrowserApiInterceptionTargetEntity';
 import { BrowserApiAllowlistingService } from './BrowserApiAllowlistingService';
 import { BrowserTokenPatternMatchingService } from './BrowserTokenPatternMatchingService';
 
