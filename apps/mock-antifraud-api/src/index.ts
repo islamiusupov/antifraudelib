@@ -1,1 +1,15 @@
 export const mockAntifraudApiAppName = '@deepcode/antifraud-mock-antifraud-api';
+export { SERVER_SIDE_FACTOR_KINDS } from './domain/constants/ServerSideFactorKinds';
+export type { ServerSideFactorKind } from './domain/constants/ServerSideFactorKinds';
+export { AntifraudFactorsEvaluatingService } from './application/services/AntifraudFactorsEvaluatingService';
+export { DecisionReportingService } from './application/services/DecisionReportingService';
+export { HealthCheckingService } from './application/services/HealthCheckingService';
+export { RecallQuestionGeneratingService } from './application/services/RecallQuestionGeneratingService';
+export type { AntifraudDecisionReport } from './domain/entities/AntifraudDecisionReport';
+export type { DecisionReportResult } from './domain/entities/DecisionReportResult';
+export type { FactorEvaluationRequest } from './domain/entities/FactorEvaluationRequest';
+export type { FactorEvaluationResponse, FactorResult } from './domain/entities/FactorEvaluationResponse';
+export type { HealthStatus } from './domain/entities/HealthStatus';
+export type { RecallQuestionRequest } from './domain/entities/RecallQuestionRequest';
+export type { RecallQuestionResponse } from './domain/entities/RecallQuestionResponse';
+export type { DecisionLevel } from './domain/value-objects/DecisionLevel';

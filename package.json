@@ -8,11 +8,11 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "npm run build:root && npm run build --workspaces --if-present",
-    "build:root": "tsc -p tsconfig.json",
+    "build": "npm run build --workspaces --if-present",
     "test": "vitest run",
     "test:architecture": "vitest run scripts/check-architecture.test.mjs && node scripts/check-architecture.cjs",
     "test:dbank-adapter": "npm run test -w @deepcode/antifraud-dbank-adapter",
+    "test:mock-antifraud-api": "npm run test -w @deepcode/antifraud-mock-antifraud-api",
     "test:mock-bank-api": "npm run test -w @deepcode/antifraud-mock-bank-api",
     "test:scenario-catalog": "npm run test -w @deepcode/antifraud-scenario-catalog",
     "scenarios:validate": "npm run build -w @deepcode/antifraud-scenario-catalog && node scripts/validate-scenarios.cjs"
