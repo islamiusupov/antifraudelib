@@ -1,4 +1,4 @@
-export type BankTransaction = {
+﻿export type BankTransactionEntity = {
   id: string;
   accountId: string;
   title: string;

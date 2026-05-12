@@ -1,7 +1,7 @@
-import type { BankDemoState } from '../../domain/entities/BankDemoState';
+﻿import type { BankDemoStateEntity } from '../../domain/entities/BankDemoStateEntity';
 
 export class BankDemoStateResettingService {
-  reset(): BankDemoState {
+  reset(): BankDemoStateEntity {
     const accounts = [
       {
         id: 'acc-1',

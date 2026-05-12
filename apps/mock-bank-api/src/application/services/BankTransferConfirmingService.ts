@@ -1,15 +1,15 @@
-import type { BankDemoState } from '../../domain/entities/BankDemoState';
-import type { BankTransaction } from '../../domain/entities/BankTransaction';
-import type { TransferConfirmResult } from '../../domain/entities/TransferConfirmResult';
+﻿import type { BankDemoStateEntity } from '../../domain/entities/BankDemoStateEntity';
+import type { BankTransactionEntity } from '../../domain/entities/BankTransactionEntity';
+import type { TransferConfirmResultEntity } from '../../domain/entities/TransferConfirmResultEntity';
 
 export type BankTransferConfirmingResult = {
-  state: BankDemoState;
-  response: TransferConfirmResult;
+  state: BankDemoStateEntity;
+  response: TransferConfirmResultEntity;
 };
 
 export class BankTransferConfirmingService {
   confirm(
-    state: BankDemoState,
+    state: BankDemoStateEntity,
     draftId: string,
     now = new Date('2026-05-11T14:24:12.000Z'),
   ): BankTransferConfirmingResult {
@@ -28,7 +28,7 @@ export class BankTransferConfirmingService {
 
     const transactionId = `tx-local-${now.getTime()}`;
     const beneficiaryName = this.resolveBeneficiaryName(state, draft);
-    const transaction: BankTransaction = {
+    const transaction: BankTransactionEntity = {
       id: transactionId,
       accountId: sourceAccount.id,
       title: `Демо-перевод: ${beneficiaryName}`,
@@ -68,7 +68,7 @@ export class BankTransferConfirmingService {
     };
   }
 
-  private resolveBeneficiaryName(state: BankDemoState, draft: BankDemoState['transferDrafts'][number]): string {
+  private resolveBeneficiaryName(state: BankDemoStateEntity, draft: BankDemoStateEntity['transferDrafts'][number]): string {
     if (draft.request.newBeneficiary) {
       return draft.request.newBeneficiary.name;
     }

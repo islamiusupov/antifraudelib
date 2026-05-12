@@ -1,6 +1,6 @@
-import type { ScenarioGroup } from '../entities/ScenarioGroup';
+﻿import type { ScenarioGroupEntity } from '../entities/ScenarioGroupEntity';
 
-export const SCENARIO_GROUPS: ScenarioGroup[] = [
+export const SCENARIO_GROUPS: ScenarioGroupEntity[] = [
   { factor: 'copy_paste_recipient', prefix: 'CPY', kind: 'factor', tier: 'LIVE', expectedCount: 20 },
   { factor: 'new_recipient', prefix: 'NRC', kind: 'factor', tier: 'MOCK', expectedCount: 20 },
   { factor: 'concurrent_media', prefix: 'CMD', kind: 'factor', tier: 'LIVE', expectedCount: 20 },

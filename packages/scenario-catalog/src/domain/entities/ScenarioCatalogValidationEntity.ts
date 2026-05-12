@@ -1,4 +1,4 @@
-export type ScenarioCatalogValidation = {
+﻿export type ScenarioCatalogValidationEntity = {
   valid: boolean;
   expectedScenarioCount: number;
   actualScenarioCount: number;

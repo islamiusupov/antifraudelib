@@ -1,13 +1,13 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import { ScenarioCatalogValidatingService } from '../../../src/application/services/ScenarioCatalogValidatingService';
 import { ScenarioIdBuildingService } from '../../../src/application/services/ScenarioIdBuildingService';
-import type { ParsedScenarioCatalog } from '../../../src/domain/entities/ParsedScenarioCatalog';
+import type { ParsedScenarioCatalogEntity } from '../../../src/domain/entities/ParsedScenarioCatalogEntity';
 
 describe('ScenarioCatalogValidatingService', () => {
   it('accepts a complete catalog with all expected scenario ids and ten composites', () => {
     const idBuildingService = new ScenarioIdBuildingService();
     const service = new ScenarioCatalogValidatingService(idBuildingService);
-    const catalog: ParsedScenarioCatalog = {
+    const catalog: ParsedScenarioCatalogEntity = {
       groups: [],
       composites: Array.from({ length: 10 }, (_, index) => ({
         id: `C${index + 1}`,
@@ -55,7 +55,7 @@ describe('ScenarioCatalogValidatingService', () => {
       tier: 'LIVE' as const,
     }));
     scenarios.push({ ...scenarios[0] });
-    const catalog: ParsedScenarioCatalog = {
+    const catalog: ParsedScenarioCatalogEntity = {
       groups: [],
       composites: [],
       scenarios,

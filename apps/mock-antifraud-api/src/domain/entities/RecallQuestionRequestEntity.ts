@@ -1,4 +1,4 @@
-export type RecallQuestionRequest = {
+﻿export type RecallQuestionRequestEntity = {
   userId: string;
   lookbackDays?: number;
   excludeRecipientHashes?: string[];

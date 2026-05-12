@@ -1,4 +1,4 @@
-export type TransferConfirmResult = {
+﻿export type TransferConfirmResultEntity = {
   transactionId: string;
   status: 'CONFIRMED';
 };

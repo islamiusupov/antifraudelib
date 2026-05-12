@@ -1,12 +1,12 @@
-import { SCENARIO_GROUPS } from '../../domain/constants/ScenarioGroups';
-import type { ParsedScenarioCatalog } from '../../domain/entities/ParsedScenarioCatalog';
-import type { ScenarioCatalogValidation } from '../../domain/entities/ScenarioCatalogValidation';
+﻿import { SCENARIO_GROUPS } from '../../domain/constants/ScenarioGroups';
+import type { ParsedScenarioCatalogEntity } from '../../domain/entities/ParsedScenarioCatalogEntity';
+import type { ScenarioCatalogValidationEntity } from '../../domain/entities/ScenarioCatalogValidationEntity';
 import { ScenarioIdBuildingService } from './ScenarioIdBuildingService';
 
 export class ScenarioCatalogValidatingService {
   constructor(private readonly scenarioIdBuildingService = new ScenarioIdBuildingService()) {}
 
-  validate(catalog: ParsedScenarioCatalog): ScenarioCatalogValidation {
+  validate(catalog: ParsedScenarioCatalogEntity): ScenarioCatalogValidationEntity {
     const expectedIds = this.scenarioIdBuildingService.buildExpectedIds();
     const seen = new Set<string>();
     const duplicateIds = new Set<string>();

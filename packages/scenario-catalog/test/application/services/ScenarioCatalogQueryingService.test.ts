@@ -1,11 +1,11 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import { ScenarioCatalogQueryingService } from '../../../src/application/services/ScenarioCatalogQueryingService';
-import type { ParsedScenarioCatalog } from '../../../src/domain/entities/ParsedScenarioCatalog';
+import type { ParsedScenarioCatalogEntity } from '../../../src/domain/entities/ParsedScenarioCatalogEntity';
 
 describe('ScenarioCatalogQueryingService', () => {
   it('returns a scenario by id', () => {
     const service = new ScenarioCatalogQueryingService();
-    const catalog: ParsedScenarioCatalog = {
+    const catalog: ParsedScenarioCatalogEntity = {
       groups: [],
       composites: [],
       scenarios: [

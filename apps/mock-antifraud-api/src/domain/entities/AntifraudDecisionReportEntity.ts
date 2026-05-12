@@ -1,6 +1,6 @@
-import type { DecisionLevel } from '../value-objects/DecisionLevel';
+﻿import type { DecisionLevel } from '../value-objects/DecisionLevel';
 
-export type AntifraudDecisionReport = {
+export type AntifraudDecisionReportEntity = {
   transactionId: string;
   userId: string;
   decision: {

@@ -1,4 +1,4 @@
-export type TransferPrepareResponse = {
+﻿export type TransferPrepareResponseEntity = {
   draftId: string;
   status: 'RISK_EVALUATED';
   riskDecision: {

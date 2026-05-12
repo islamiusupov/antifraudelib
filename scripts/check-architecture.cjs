@@ -11,6 +11,7 @@ function runArchitectureCheck(root = ROOT) {
 
   ensureNoTestsInSrc(files, errors);
   ensureNoDtoDirectory(root, errors);
+  ensureEntityNaming(files, errors);
   ensureSourceFilesHaveMirroredTests(files, errors);
   ensureServiceNaming(files, errors);
   ensureDomainImportsPointInward(files, errors);
@@ -74,6 +75,28 @@ function listDirectories(root) {
   }
   visit(root);
   return directories;
+}
+
+function ensureEntityNaming(files, errors) {
+  for (const file of files) {
+    const normalized = normalize(file);
+    if (!normalized.includes('/src/domain/entities/')) continue;
+    if (!/\.[tj]sx?$/.test(normalized)) continue;
+
+    const basename = path.basename(file).replace(/\.[tj]sx?$/, '');
+    if (!basename.endsWith('Entity')) {
+      errors.push(`Entity file must end with Entity: ${relative(file)}`);
+    }
+
+    const content = fs.readFileSync(file, 'utf8');
+    const exportedTypes = Array.from(content.matchAll(/export\s+type\s+([A-Za-z0-9_]+)/g)).map((match) => match[1]);
+    const exportedClasses = Array.from(content.matchAll(/export\s+class\s+([A-Za-z0-9_]+)/g)).map((match) => match[1]);
+    for (const exportedName of [...exportedTypes, ...exportedClasses]) {
+      if (!exportedName.endsWith('Entity')) {
+        errors.push(`Entity export must end with Entity: ${exportedName} in ${relative(file)}`);
+      }
+    }
+  }
 }
 
 function ensureSourceFilesHaveMirroredTests(files, errors) {

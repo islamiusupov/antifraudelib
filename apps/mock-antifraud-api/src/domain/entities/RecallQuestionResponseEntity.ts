@@ -1,4 +1,4 @@
-export type RecallQuestionResponse =
+﻿export type RecallQuestionResponseEntity =
   | {
       challengeId: string;
       kind: 'recall_question';

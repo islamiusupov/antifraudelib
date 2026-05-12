@@ -1,6 +1,6 @@
-import type { ScenarioVerdict } from '../value-objects/ScenarioVerdict';
+﻿import type { ScenarioVerdict } from '../value-objects/ScenarioVerdict';
 
-export type CompositeScenario = {
+export type CompositeScenarioEntity = {
   id: string;
   title: string;
   combo: string[];

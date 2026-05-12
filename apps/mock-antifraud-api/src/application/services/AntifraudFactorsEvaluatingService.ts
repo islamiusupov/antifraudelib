@@ -1,9 +1,9 @@
-import { SERVER_SIDE_FACTOR_KINDS } from '../../domain/constants/ServerSideFactorKinds';
-import type { FactorEvaluationRequest } from '../../domain/entities/FactorEvaluationRequest';
-import type { FactorEvaluationResponse, FactorResult } from '../../domain/entities/FactorEvaluationResponse';
+﻿import { SERVER_SIDE_FACTOR_KINDS } from '../../domain/constants/ServerSideFactorKinds';
+import type { FactorEvaluationRequestEntity } from '../../domain/entities/FactorEvaluationRequestEntity';
+import type { FactorEvaluationResponseEntity, FactorResultEntity } from '../../domain/entities/FactorEvaluationResponseEntity';
 
 export class AntifraudFactorsEvaluatingService {
-  evaluate(request: FactorEvaluationRequest): FactorEvaluationResponse {
+  evaluate(request: FactorEvaluationRequestEntity): FactorEvaluationResponseEntity {
     return {
       transactionId: request.transactionId,
       elapsedMs: 42,
@@ -11,7 +11,7 @@ export class AntifraudFactorsEvaluatingService {
     };
   }
 
-  private evaluateFactor(kind: string, scenarioId?: string): FactorResult {
+  private evaluateFactor(kind: string, scenarioId?: string): FactorResultEntity {
     if (!SERVER_SIDE_FACTOR_KINDS.includes(kind as never)) {
       return {
         kind,
@@ -36,7 +36,7 @@ export class AntifraudFactorsEvaluatingService {
   private scenarioContribution(
     kind: string,
     scenarioId?: string,
-  ): Pick<FactorResult, 'contribution' | 'maxContribution' | 'reasonCodes' | 'metadata'> {
+  ): Pick<FactorResultEntity, 'contribution' | 'maxContribution' | 'reasonCodes' | 'metadata'> {
     if (scenarioId === 'seip_safe_account' || scenarioId === 'C1') {
       if (kind === 'new_recipient') {
         return {

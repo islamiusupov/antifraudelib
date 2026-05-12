@@ -1,8 +1,8 @@
-import { SCENARIO_GROUPS } from '../../domain/constants/ScenarioGroups';
-import type { CatalogScenario } from '../../domain/entities/CatalogScenario';
-import type { CompositeScenario } from '../../domain/entities/CompositeScenario';
-import type { ParsedScenarioCatalog } from '../../domain/entities/ParsedScenarioCatalog';
-import type { ScenarioGroup } from '../../domain/entities/ScenarioGroup';
+﻿import { SCENARIO_GROUPS } from '../../domain/constants/ScenarioGroups';
+import type { CatalogScenarioEntity } from '../../domain/entities/CatalogScenarioEntity';
+import type { CompositeScenarioEntity } from '../../domain/entities/CompositeScenarioEntity';
+import type { ParsedScenarioCatalogEntity } from '../../domain/entities/ParsedScenarioCatalogEntity';
+import type { ScenarioGroupEntity } from '../../domain/entities/ScenarioGroupEntity';
 import type { ScenarioType } from '../../domain/value-objects/ScenarioType';
 import { MarkdownTableRowParsingService } from './MarkdownTableRowParsingService';
 import { ScenarioIdBuildingService } from './ScenarioIdBuildingService';
@@ -17,11 +17,11 @@ export class ScenarioCatalogParsingService {
     private readonly scenarioVerdictNormalizingService = new ScenarioVerdictNormalizingService(),
   ) {}
 
-  parse(markdown: string): ParsedScenarioCatalog {
-    const scenarios: CatalogScenario[] = [];
-    const composites: CompositeScenario[] = [];
+  parse(markdown: string): ParsedScenarioCatalogEntity {
+    const scenarios: CatalogScenarioEntity[] = [];
+    const composites: CompositeScenarioEntity[] = [];
     const unknownGroups = new Set<string>();
-    let currentGroup: ScenarioGroup | null = null;
+    let currentGroup: ScenarioGroupEntity | null = null;
     let inCompositeSection = false;
 
     for (const rawLine of markdown.split(/\r?\n/)) {
@@ -69,7 +69,7 @@ export class ScenarioCatalogParsingService {
     };
   }
 
-  private tryAppendCompositeScenario(line: string, composites: CompositeScenario[]): void {
+  private tryAppendCompositeScenario(line: string, composites: CompositeScenarioEntity[]): void {
     const cells = this.markdownTableRowParsingService.parse(line);
     if (cells.length < 4 || cells[0] === '#') return;
 
@@ -87,8 +87,8 @@ export class ScenarioCatalogParsingService {
 
   private tryAppendCatalogScenario(
     line: string,
-    currentGroup: ScenarioGroup,
-    scenarios: CatalogScenario[],
+    currentGroup: ScenarioGroupEntity,
+    scenarios: CatalogScenarioEntity[],
   ): void {
     const cells = this.markdownTableRowParsingService.parse(line);
     if (cells.length < 4 || cells[0] === '#') return;

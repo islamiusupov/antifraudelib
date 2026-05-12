@@ -1,12 +1,12 @@
-export type NewBeneficiaryInput = {
+﻿export type NewBeneficiaryInputEntity = {
   name: string;
   destination: string;
 };
 
-export type TransferPrepareRequest = {
+export type TransferPrepareRequestEntity = {
   sourceAccountId: string;
   beneficiaryId?: string;
-  newBeneficiary?: NewBeneficiaryInput;
+  newBeneficiary?: NewBeneficiaryInputEntity;
   amount: number;
   currency: string;
 };

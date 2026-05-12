@@ -1,16 +1,16 @@
-import type { BankDemoState } from '../../domain/entities/BankDemoState';
-import type { TransferPrepareRequest } from '../../domain/entities/TransferPrepareRequest';
-import type { TransferPrepareResponse } from '../../domain/entities/TransferPrepareResponse';
+﻿import type { BankDemoStateEntity } from '../../domain/entities/BankDemoStateEntity';
+import type { TransferPrepareRequestEntity } from '../../domain/entities/TransferPrepareRequestEntity';
+import type { TransferPrepareResponseEntity } from '../../domain/entities/TransferPrepareResponseEntity';
 
 export type BankTransferPreparingResult = {
-  state: BankDemoState;
-  response: TransferPrepareResponse;
+  state: BankDemoStateEntity;
+  response: TransferPrepareResponseEntity;
 };
 
 export class BankTransferPreparingService {
   prepare(
-    state: BankDemoState,
-    request: TransferPrepareRequest,
+    state: BankDemoStateEntity,
+    request: TransferPrepareRequestEntity,
     now = new Date('2026-05-11T14:23:45.000Z'),
   ): BankTransferPreparingResult {
     const sourceAccount = state.accounts.find((account) => account.id === request.sourceAccountId);
@@ -28,7 +28,7 @@ export class BankTransferPreparingService {
     }
 
     const draftId = `td-local-${now.getTime()}`;
-    const response: TransferPrepareResponse = {
+    const response: TransferPrepareResponseEntity = {
       draftId,
       status: 'RISK_EVALUATED',
       riskDecision: {

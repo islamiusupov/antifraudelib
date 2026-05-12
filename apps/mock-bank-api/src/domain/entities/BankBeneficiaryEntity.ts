@@ -1,4 +1,4 @@
-export type BankBeneficiary = {
+﻿export type BankBeneficiaryEntity = {
   id: string;
   name: string;
   type: 'ACCOUNT' | 'CARD' | 'PHONE';

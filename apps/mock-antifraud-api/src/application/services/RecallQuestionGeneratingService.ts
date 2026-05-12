@@ -1,11 +1,11 @@
-import type { RecallQuestionRequest } from '../../domain/entities/RecallQuestionRequest';
-import type { RecallQuestionResponse } from '../../domain/entities/RecallQuestionResponse';
+﻿import type { RecallQuestionRequestEntity } from '../../domain/entities/RecallQuestionRequestEntity';
+import type { RecallQuestionResponseEntity } from '../../domain/entities/RecallQuestionResponseEntity';
 
 export class RecallQuestionGeneratingService {
   generate(
-    request: RecallQuestionRequest,
+    request: RecallQuestionRequestEntity,
     now = new Date('2026-05-11T14:23:45.000Z'),
-  ): RecallQuestionResponse {
+  ): RecallQuestionResponseEntity {
     if (request.userId === 'new-user-without-history') {
       return {
         status: 'insufficient_history',

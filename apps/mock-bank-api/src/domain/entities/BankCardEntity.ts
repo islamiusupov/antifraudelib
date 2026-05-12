@@ -1,4 +1,4 @@
-export type BankCard = {
+﻿export type BankCardEntity = {
   id: string;
   accountId: string;
   label: string;

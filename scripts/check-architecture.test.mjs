@@ -45,6 +45,19 @@ describe('check-architecture', () => {
     );
   });
 
+  it('rejects entity files and exports without Entity suffix', () => {
+    const root = createTempProject({
+      'packages/example/src/domain/entities/BankAccount.ts': 'export type BankAccount = {}',
+    });
+
+    expect(runArchitectureCheck(root)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Entity file must end with Entity'),
+        expect.stringContaining('Entity export must end with Entity'),
+      ]),
+    );
+  });
+
   it('rejects domain imports from outer layers and D-bank references in react package', () => {
     const root = createTempProject({
       'packages/example/src/domain/entities/FraudEntity.ts': "import '../application/services/BadService';",

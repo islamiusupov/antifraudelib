@@ -1,8 +1,8 @@
-import { SERVER_SIDE_FACTOR_KINDS } from '../../domain/constants/ServerSideFactorKinds';
-import type { HealthStatus } from '../../domain/entities/HealthStatus';
+﻿import { SERVER_SIDE_FACTOR_KINDS } from '../../domain/constants/ServerSideFactorKinds';
+import type { HealthStatusEntity } from '../../domain/entities/HealthStatusEntity';
 
 export class HealthCheckingService {
-  check(): HealthStatus {
+  check(): HealthStatusEntity {
     const factors: Record<string, 'ok'> = {};
     for (const kind of SERVER_SIDE_FACTOR_KINDS) {
       factors[kind] = 'ok';

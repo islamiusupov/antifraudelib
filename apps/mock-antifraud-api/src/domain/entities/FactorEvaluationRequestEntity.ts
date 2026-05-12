@@ -1,4 +1,4 @@
-export type FactorEvaluationRequest = {
+﻿export type FactorEvaluationRequestEntity = {
   transactionId: string;
   userId: string;
   scenarioId?: string;

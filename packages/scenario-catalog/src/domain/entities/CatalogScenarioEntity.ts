@@ -1,9 +1,9 @@
-import type { ScenarioKind } from '../value-objects/ScenarioKind';
+﻿import type { ScenarioKind } from '../value-objects/ScenarioKind';
 import type { ScenarioTier } from '../value-objects/ScenarioTier';
 import type { ScenarioType } from '../value-objects/ScenarioType';
 import type { ScenarioVerdict } from '../value-objects/ScenarioVerdict';
 
-export type CatalogScenario = {
+export type CatalogScenarioEntity = {
   id: string;
   factor: string;
   prefix: string;

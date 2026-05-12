@@ -1,10 +1,10 @@
-export type FactorEvaluationResponse = {
+﻿export type FactorEvaluationResponseEntity = {
   transactionId: string;
   elapsedMs: number;
-  evaluations: FactorResult[];
+  evaluations: FactorResultEntity[];
 };
 
-export type FactorResult = {
+export type FactorResultEntity = {
   kind: string;
   status: 'ok' | 'unknown_factor' | 'timeout' | 'error' | 'insufficient_data';
   contribution: number;

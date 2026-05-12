@@ -1,8 +1,8 @@
-import type { AntifraudDecisionReport } from '../../domain/entities/AntifraudDecisionReport';
-import type { DecisionReportResult } from '../../domain/entities/DecisionReportResult';
+﻿import type { AntifraudDecisionReportEntity } from '../../domain/entities/AntifraudDecisionReportEntity';
+import type { DecisionReportResultEntity } from '../../domain/entities/DecisionReportResultEntity';
 
 export class DecisionReportingService {
-  report(decisionReport: AntifraudDecisionReport): DecisionReportResult {
+  report(decisionReport: AntifraudDecisionReportEntity): DecisionReportResultEntity {
     if (!decisionReport.transactionId) {
       throw new Error('Decision report requires transactionId.');
     }
