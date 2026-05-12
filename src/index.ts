@@ -1,1 +1,1 @@
-export * from './scenarios/catalog';
+export {};

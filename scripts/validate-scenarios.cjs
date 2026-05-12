@@ -1,14 +1,14 @@
 const fs = require('fs');
 const path = require('path');
 const {
-  parseScenariosCatalog,
-  validateScenarioCatalog,
-} = require('../dist');
+  ScenarioCatalogParsingService,
+  ScenarioCatalogValidatingService,
+} = require('../packages/scenario-catalog/dist');
 
 const catalogPath = path.resolve(__dirname, '..', 'prd', 'Scenarios_Catalog_v0.3.md');
 const markdown = fs.readFileSync(catalogPath, 'utf8');
-const catalog = parseScenariosCatalog(markdown);
-const validation = validateScenarioCatalog(catalog);
+const catalog = new ScenarioCatalogParsingService().parse(markdown);
+const validation = new ScenarioCatalogValidatingService().validate(catalog);
 
 if (!validation.valid) {
   console.error('Scenario catalog validation failed:');

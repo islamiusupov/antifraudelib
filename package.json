@@ -10,11 +10,13 @@
   "scripts": {
     "build": "npm run build:root && npm run build --workspaces --if-present",
     "build:root": "tsc -p tsconfig.json",
-    "scenarios:validate": "npm run build:root && node scripts/validate-scenarios.cjs"
+    "test": "vitest run",
+    "test:scenario-catalog": "npm run test -w @deepcode/antifraud-scenario-catalog",
+    "scenarios:validate": "npm run build -w @deepcode/antifraud-scenario-catalog && node scripts/validate-scenarios.cjs"
   },
-  "dependencies": {},
   "devDependencies": {
-    "typescript": "^5.5.3"
+    "typescript": "^5.5.3",
+    "vitest": "^4.1.6"
   },
   "private": true
 }
