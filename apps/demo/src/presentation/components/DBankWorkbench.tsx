@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { DBankBridgeMessageParsingService, type DBankObservedEventEntity } from '@deepcode/antifraud-dbank-adapter';
-import { DecisionBadge, DeepFraud, DeepFraudRoot, ReasonCodeList, RiskMeter } from '@deepcode/antifraud-react';
+import { DecisionBadge, DeepFraud, DeepFraudRoot, ReasonCodeList, RiskMeter, VisualChallengeGate } from '@deepcode/antifraud-react';
 import { DBankEventRiskFactorsBuildingService } from '../../application/services/DBankEventRiskFactorsBuildingService';
 import type { DemoWorkbenchConfigEntity } from '../../domain/entities/DemoWorkbenchConfigEntity';
 
@@ -56,6 +56,7 @@ export function DBankWorkbench({ config }: DBankWorkbenchProps) {
         <aside className="deepfraud-demo-workbench__result" data-dbank-event-count={observedEvents.length}>
           <RiskMeter />
           <DecisionBadge />
+          <VisualChallengeGate autoRequest />
           <ReasonCodeList />
         </aside>
       </main>
