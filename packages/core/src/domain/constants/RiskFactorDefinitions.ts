@@ -20,7 +20,7 @@ export const RISK_FACTOR_DEFINITIONS: FactorDefinitionEntity[] = [
   { kind: 'phishing_url', maxContribution: 40, source: 'live', tier: 'LIVE' },
   { kind: 'clipboard_otp_pattern', maxContribution: 50, source: 'live', tier: 'LIVE' },
   { kind: 'programmatic_clipboard_read', maxContribution: 20, source: 'live', tier: 'LIVE' },
-  { kind: 'composite_risk_boost', maxContribution: 10, source: 'live', tier: 'LIVE' },
+  { kind: 'composite_risk_boost', maxContribution: 35, source: 'live', tier: 'LIVE' },
   { kind: 'native_tampering', maxContribution: 40, source: 'live', tier: 'LIVE' },
   { kind: 'dev_environment', maxContribution: 15, source: 'live', tier: 'LIVE' },
   { kind: 'environment_conflicts', maxContribution: 35, source: 'paper', tier: 'PAPER' },

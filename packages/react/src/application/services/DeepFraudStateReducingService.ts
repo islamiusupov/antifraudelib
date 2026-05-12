@@ -59,19 +59,30 @@ export class DeepFraudStateReducingService {
   private addCompositeFactors(factors: RiskFactorEntity[]): RiskFactorEntity[] {
     if (this.hasFactor(factors, 'composite_risk_boost')) return factors;
     if (this.hasFactor(factors, 'copy_paste_recipient') && this.hasFactor(factors, 'concurrent_media')) {
-      return [
-        ...factors,
-        {
-          kind: 'composite_risk_boost',
-          contribution: 10,
-          maxContribution: 10,
-          status: 'ok',
-          source: 'live',
-          reasonCodes: ['copy_paste_concurrent_media_composite'],
-        },
-      ];
+      return this.withCompositeBoost(factors, 'copy_paste_concurrent_media_composite');
+    }
+    if (
+      this.hasFactor(factors, 'new_recipient') &&
+      this.hasFactor(factors, 'page_visibility') &&
+      this.hasFactor(factors, 'amount_anomaly')
+    ) {
+      return this.withCompositeBoost(factors, 'new_recipient_page_visibility_amount_composite');
     }
     return factors;
+  }
+
+  private withCompositeBoost(factors: RiskFactorEntity[], reasonCode: string): RiskFactorEntity[] {
+    return [
+      ...factors,
+      {
+        kind: 'composite_risk_boost',
+        contribution: 10,
+        maxContribution: 10,
+        status: 'ok',
+        source: 'live',
+        reasonCodes: [reasonCode],
+      },
+    ];
   }
 
   private hasFactor(factors: RiskFactorEntity[], kind: RiskFactorEntity['kind']): boolean {

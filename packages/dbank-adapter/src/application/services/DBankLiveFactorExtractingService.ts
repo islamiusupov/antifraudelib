@@ -1,9 +1,14 @@
 import type { RiskSignalEntity } from '@deepcode/antifraud-core';
 import type { DBankObservedEventEntity } from '../../domain/dbank/entities/DBankObservedEventEntity';
 
+const CURRENT_SESSION_NEW_RECIPIENT_BOOST = 35;
+const LAYERING_RECIPIENT_COUNT = 3;
+const LAYERING_WINDOW_MS = 60 * 60 * 1000;
+
 export class DBankLiveFactorExtractingService {
   extract(events: DBankObservedEventEntity[]): RiskSignalEntity[] {
     const signals: RiskSignalEntity[] = [];
+    const hasNewRecipientLayeringPattern = this.hasNewRecipientLayeringPattern(events);
 
     if (this.hasEvent(events, 'recipient_pasted')) {
       signals.push({
@@ -25,7 +30,28 @@ export class DBankLiveFactorExtractingService {
     }
     const recipientCreatedEvent = events.find((event) => event.kind === 'recipient_created');
     if (recipientCreatedEvent !== undefined) {
-      signals.push(this.newRecipientSignal(recipientCreatedEvent));
+      signals.push(this.newRecipientSignal(recipientCreatedEvent, hasNewRecipientLayeringPattern));
+      if (this.isCurrentSessionUnusedRecipient(recipientCreatedEvent.metadata)) {
+        signals.push(this.currentSessionNewRecipientBoostSignal(recipientCreatedEvent));
+      }
+    }
+    if (hasNewRecipientLayeringPattern) {
+      signals.push(
+        {
+          kind: 'recipient_velocity',
+          detected: true,
+          confidence: 1,
+          reasonCodes: ['new_recipient_layering_pattern'],
+          source: 'server',
+        },
+        {
+          kind: 'velocity_anomaly',
+          detected: true,
+          confidence: 1,
+          reasonCodes: ['layering_different_amounts'],
+          source: 'server',
+        },
+      );
     }
     if (this.hasEvent(events, 'media_active')) {
       signals.push({
@@ -201,13 +227,23 @@ export class DBankLiveFactorExtractingService {
     return events.some((event) => event.kind === kind);
   }
 
-  private newRecipientSignal(event: DBankObservedEventEntity): RiskSignalEntity {
+  private newRecipientSignal(event: DBankObservedEventEntity, hasLayeringPattern = false): RiskSignalEntity {
     if (this.isServerVerifiedNewRecipient(event.metadata)) {
       return {
         kind: 'new_recipient',
         detected: true,
         confidence: 1,
         reasonCodes: ['new_recipient_in_flow'],
+        source: 'server',
+        metadata: event.metadata,
+      };
+    }
+    if (hasLayeringPattern) {
+      return {
+        kind: 'new_recipient',
+        detected: true,
+        confidence: 1,
+        reasonCodes: ['new_recipient_layering_pattern'],
         source: 'server',
         metadata: event.metadata,
       };
@@ -225,8 +261,102 @@ export class DBankLiveFactorExtractingService {
     };
   }
 
+  private currentSessionNewRecipientBoostSignal(event: DBankObservedEventEntity): RiskSignalEntity {
+    return {
+      kind: 'composite_risk_boost',
+      detected: true,
+      contribution: CURRENT_SESSION_NEW_RECIPIENT_BOOST,
+      maxContribution: CURRENT_SESSION_NEW_RECIPIENT_BOOST,
+      reasonCodes: ['recipient_added_current_session_no_previous_use'],
+      source: 'server',
+      metadata: event.metadata,
+    };
+  }
+
   private isServerVerifiedNewRecipient(metadata: DBankObservedEventEntity['metadata']): boolean {
     return metadata?.serverVerified === true;
+  }
+
+  private isCurrentSessionUnusedRecipient(metadata: DBankObservedEventEntity['metadata']): boolean {
+    return (
+      this.isServerVerifiedNewRecipient(metadata) &&
+      this.isCurrentSessionRecipient(metadata) &&
+      this.hasNoPreviousRecipientUse(metadata)
+    );
+  }
+
+  private isCurrentSessionRecipient(metadata: DBankObservedEventEntity['metadata']): boolean {
+    return (
+      metadata?.createdInCurrentSession === true ||
+      metadata?.addedInCurrentSession === true ||
+      metadata?.currentSessionRecipient === true
+    );
+  }
+
+  private hasNoPreviousRecipientUse(metadata: DBankObservedEventEntity['metadata']): boolean {
+    const txCountToRecipient = metadata?.txCountToRecipient;
+    if (typeof txCountToRecipient === 'number') return txCountToRecipient <= 0;
+    const previousUseCount = metadata?.previousUseCount;
+    if (typeof previousUseCount === 'number') return previousUseCount <= 0;
+    return metadata?.hasPreviousUse === false;
+  }
+
+  private hasNewRecipientLayeringPattern(events: DBankObservedEventEntity[]): boolean {
+    const recipientEvents = events
+      .filter((event) => event.kind === 'recipient_created')
+      .sort((left, right) => left.atMs - right.atMs);
+
+    return recipientEvents.some((event, index) => {
+      const windowEvents = recipientEvents
+        .slice(index)
+        .filter((candidate) => candidate.atMs - event.atMs <= LAYERING_WINDOW_MS);
+      return (
+        windowEvents.length >= LAYERING_RECIPIENT_COUNT &&
+        this.hasDistinctRecipients(windowEvents) &&
+        this.hasDistinctAmounts(windowEvents)
+      );
+    });
+  }
+
+  private hasDistinctRecipients(events: DBankObservedEventEntity[]): boolean {
+    const recipientKeys = events
+      .map((event) => this.extractStringMetadata(event.metadata, ['recipientId', 'beneficiaryId', 'accountNumber', 'iban']))
+      .filter((value): value is string => value !== null);
+    if (recipientKeys.length === 0) return true;
+    return new Set(recipientKeys).size >= LAYERING_RECIPIENT_COUNT;
+  }
+
+  private hasDistinctAmounts(events: DBankObservedEventEntity[]): boolean {
+    const amounts = events
+      .map((event) => this.extractNumberMetadata(event.metadata, ['amount', 'transferAmount', 'transactionAmount']))
+      .filter((value): value is number => value !== null);
+    return amounts.length >= LAYERING_RECIPIENT_COUNT && new Set(amounts.map((amount) => amount.toFixed(2))).size >= LAYERING_RECIPIENT_COUNT;
+  }
+
+  private extractStringMetadata(
+    metadata: DBankObservedEventEntity['metadata'],
+    keys: string[],
+  ): string | null {
+    for (const key of keys) {
+      const value = metadata?.[key];
+      if (typeof value === 'string' && value.trim() !== '') return value;
+    }
+    return null;
+  }
+
+  private extractNumberMetadata(
+    metadata: DBankObservedEventEntity['metadata'],
+    keys: string[],
+  ): number | null {
+    for (const key of keys) {
+      const value = metadata?.[key];
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      if (typeof value === 'string') {
+        const normalizedValue = Number(value.replace(',', '.'));
+        if (Number.isFinite(normalizedValue)) return normalizedValue;
+      }
+    }
+    return null;
   }
 
   private hasFastWarningConfirmation(events: DBankObservedEventEntity[]): boolean {

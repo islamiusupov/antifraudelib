@@ -153,6 +153,71 @@ describe('BankActionScenarioRecognizingService', () => {
       }),
     ]);
   });
+
+  it('recognizes NRC-03 current-session recipient with no previous use as a step-up risk trace', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('recipient_created', 100, {
+          createdInCurrentSession: true,
+          txCountToRecipient: 0,
+        }),
+      ],
+      catalog(),
+    );
+
+    expect(result.recognitions).toEqual([
+      expect.objectContaining({
+        factor: 'new_recipient',
+        reasonCodes: ['new_recipient_in_flow'],
+        candidateScenarioIds: expect.arrayContaining(['NRC-03']),
+      }),
+      expect.objectContaining({
+        factor: 'composite_risk_boost',
+        reasonCodes: ['recipient_added_current_session_no_previous_use'],
+        candidateScenarioIds: [],
+      }),
+    ]);
+    expect(result.riskSignals.map((signal) => signal.kind)).toEqual([
+      'new_recipient',
+      'composite_risk_boost',
+    ]);
+  });
+
+  it('recognizes NRC-04 layering from three new recipients with different amounts in one hour', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('recipient_created', 100, { recipientId: 'r-1', amount: 1000 }),
+        action('recipient_created', 1000, { recipientId: 'r-2', amount: 2200 }),
+        action('recipient_created', 3000, { recipientId: 'r-3', amount: 3600 }),
+      ],
+      catalog(),
+    );
+
+    expect(result.recognitions).toEqual([
+      expect.objectContaining({
+        factor: 'new_recipient',
+        reasonCodes: ['new_recipient_layering_pattern'],
+        candidateScenarioIds: expect.arrayContaining(['NRC-04']),
+      }),
+      expect.objectContaining({
+        factor: 'recipient_velocity',
+        reasonCodes: ['new_recipient_layering_pattern'],
+      }),
+      expect.objectContaining({
+        factor: 'velocity_anomaly',
+        reasonCodes: ['layering_different_amounts'],
+      }),
+    ]);
+    expect(result.riskSignals.map((signal) => signal.kind)).toEqual([
+      'new_recipient',
+      'recipient_velocity',
+      'velocity_anomaly',
+    ]);
+  });
 });
 
 function catalog() {

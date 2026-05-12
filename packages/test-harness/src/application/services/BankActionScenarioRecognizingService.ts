@@ -5,6 +5,9 @@ import type { ScenarioRecognitionEntity } from '../../domain/harness/entities/Sc
 import type { ScenarioRecognitionResultEntity } from '../../domain/harness/entities/ScenarioRecognitionResultEntity';
 import { CompositeScenarioRecognizingService } from './CompositeScenarioRecognizingService';
 
+const LAYERING_RECIPIENT_COUNT = 3;
+const LAYERING_WINDOW_MS = 60 * 60 * 1000;
+
 export class BankActionScenarioRecognizingService {
   constructor(private readonly compositeScenarioRecognizingService = new CompositeScenarioRecognizingService()) {}
 
@@ -26,12 +29,36 @@ export class BankActionScenarioRecognizingService {
     catalog: ParsedScenarioCatalogEntity,
   ): ScenarioRecognitionEntity[] {
     const recognitions: ScenarioRecognitionEntity[] = [];
+    const hasNewRecipientLayeringPattern = this.hasNewRecipientLayeringPattern(actions);
 
     if (this.hasAction(actions, 'media_active')) {
       recognitions.push(this.createRecognition('concurrent_media', 1, ['concurrent_media_active'], catalog));
     }
     if (this.hasAction(actions, 'recipient_created')) {
-      recognitions.push(this.createRecognition('new_recipient', 1, ['new_recipient_in_flow'], catalog));
+      recognitions.push(
+        this.createRecognition(
+          'new_recipient',
+          1,
+          hasNewRecipientLayeringPattern ? ['new_recipient_layering_pattern'] : ['new_recipient_in_flow'],
+          catalog,
+        ),
+      );
+      if (this.hasCurrentSessionUnusedRecipient(actions)) {
+        recognitions.push(
+          this.createRecognition(
+            'composite_risk_boost',
+            1,
+            ['recipient_added_current_session_no_previous_use'],
+            catalog,
+          ),
+        );
+      }
+    }
+    if (hasNewRecipientLayeringPattern) {
+      recognitions.push(
+        this.createRecognition('recipient_velocity', 1, ['new_recipient_layering_pattern'], catalog),
+        this.createRecognition('velocity_anomaly', 1, ['layering_different_amounts'], catalog),
+      );
     }
     if (this.hasAction(actions, 'recipient_pasted')) {
       recognitions.push(this.createRecognition('copy_paste_recipient', 1, ['copy_paste_recipient'], catalog));
@@ -126,6 +153,84 @@ export class BankActionScenarioRecognizingService {
 
   private hasAction(actions: BankActionEntity[], kind: BankActionEntity['kind']): boolean {
     return actions.some((action) => action.kind === kind);
+  }
+
+  private hasCurrentSessionUnusedRecipient(actions: BankActionEntity[]): boolean {
+    return actions
+      .filter((action) => action.kind === 'recipient_created')
+      .some((action) => this.isCurrentSessionUnusedRecipient(action.metadata));
+  }
+
+  private isCurrentSessionUnusedRecipient(metadata: BankActionEntity['metadata']): boolean {
+    return this.isCurrentSessionRecipient(metadata) && this.hasNoPreviousRecipientUse(metadata);
+  }
+
+  private isCurrentSessionRecipient(metadata: BankActionEntity['metadata']): boolean {
+    return (
+      metadata?.createdInCurrentSession === true ||
+      metadata?.addedInCurrentSession === true ||
+      metadata?.currentSessionRecipient === true
+    );
+  }
+
+  private hasNoPreviousRecipientUse(metadata: BankActionEntity['metadata']): boolean {
+    const txCountToRecipient = metadata?.txCountToRecipient;
+    if (typeof txCountToRecipient === 'number') return txCountToRecipient <= 0;
+    const previousUseCount = metadata?.previousUseCount;
+    if (typeof previousUseCount === 'number') return previousUseCount <= 0;
+    return metadata?.hasPreviousUse === false;
+  }
+
+  private hasNewRecipientLayeringPattern(actions: BankActionEntity[]): boolean {
+    const recipientActions = actions
+      .filter((action) => action.kind === 'recipient_created')
+      .sort((left, right) => left.atMs - right.atMs);
+
+    return recipientActions.some((action, index) => {
+      const windowActions = recipientActions
+        .slice(index)
+        .filter((candidate) => candidate.atMs - action.atMs <= LAYERING_WINDOW_MS);
+      return (
+        windowActions.length >= LAYERING_RECIPIENT_COUNT &&
+        this.hasDistinctRecipients(windowActions) &&
+        this.hasDistinctAmounts(windowActions)
+      );
+    });
+  }
+
+  private hasDistinctRecipients(actions: BankActionEntity[]): boolean {
+    const recipientKeys = actions
+      .map((action) => this.extractStringMetadata(action.metadata, ['recipientId', 'beneficiaryId', 'accountNumber', 'iban']))
+      .filter((value): value is string => value !== null);
+    if (recipientKeys.length === 0) return true;
+    return new Set(recipientKeys).size >= LAYERING_RECIPIENT_COUNT;
+  }
+
+  private hasDistinctAmounts(actions: BankActionEntity[]): boolean {
+    const amounts = actions
+      .map((action) => this.extractNumberMetadata(action.metadata, ['amount', 'transferAmount', 'transactionAmount']))
+      .filter((value): value is number => value !== null);
+    return amounts.length >= LAYERING_RECIPIENT_COUNT && new Set(amounts.map((amount) => amount.toFixed(2))).size >= LAYERING_RECIPIENT_COUNT;
+  }
+
+  private extractStringMetadata(metadata: BankActionEntity['metadata'], keys: string[]): string | null {
+    for (const key of keys) {
+      const value = metadata?.[key];
+      if (typeof value === 'string' && value.trim() !== '') return value;
+    }
+    return null;
+  }
+
+  private extractNumberMetadata(metadata: BankActionEntity['metadata'], keys: string[]): number | null {
+    for (const key of keys) {
+      const value = metadata?.[key];
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      if (typeof value === 'string') {
+        const normalizedValue = Number(value.replace(',', '.'));
+        if (Number.isFinite(normalizedValue)) return normalizedValue;
+      }
+    }
+    return null;
   }
 
   private hasFastWarningConfirmation(actions: BankActionEntity[]): boolean {

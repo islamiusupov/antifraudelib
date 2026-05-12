@@ -267,6 +267,39 @@ describe('DeepFraudStateReducingService', () => {
     expect(transactionState.assessment.decision.level).toBe('step_up');
   });
 
+  it('steps up NRC-03 current-session recipient with no previous use', () => {
+    const service = new DeepFraudStateReducingService();
+
+    const state = service.createInitialState({
+      userId: 'user-1',
+      consent: 'behavioral',
+      factors: [
+        factor('new_recipient', 25, 25, ['new_recipient_in_flow']),
+        factor('composite_risk_boost', 35, 35, ['recipient_added_current_session_no_previous_use']),
+      ],
+    });
+
+    expect(state.assessment.score).toBe(60);
+    expect(state.assessment.decision.level).toBe('step_up');
+  });
+
+  it('blocks NRC-04 three new recipients with different amounts in one hour', () => {
+    const service = new DeepFraudStateReducingService();
+
+    const state = service.createInitialState({
+      userId: 'user-1',
+      consent: 'behavioral',
+      factors: [
+        factor('new_recipient', 25, 25, ['new_recipient_layering_pattern']),
+        factor('recipient_velocity', 35, 35, ['new_recipient_layering_pattern']),
+        factor('velocity_anomaly', 25, 25, ['layering_different_amounts']),
+      ],
+    });
+
+    expect(state.assessment.score).toBe(85);
+    expect(state.assessment.decision.level).toBe('block');
+  });
+
   it('blocks COMP-17 copy-paste with new recipient and amount above history P95', () => {
     const service = new DeepFraudStateReducingService();
 
@@ -322,6 +355,32 @@ describe('DeepFraudStateReducingService', () => {
     });
 
     expect(state.assessment.score).toBe(100);
+    expect(state.assessment.decision.level).toBe('block');
+  });
+
+  it('blocks COMP-20 new recipient with frequent page exits and top decile amount', () => {
+    const service = new DeepFraudStateReducingService();
+
+    const state = service.createInitialState({
+      userId: 'user-1',
+      consent: 'behavioral',
+      factors: [
+        factor('new_recipient', 25, 25, ['new_recipient_in_flow']),
+        factor('page_visibility', 20, 25, ['page_visibility_oscillation']),
+        factor('amount_anomaly', 30, 30, ['amount_top_decile']),
+      ],
+    });
+
+    expect(state.factors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'composite_risk_boost',
+          contribution: 10,
+          reasonCodes: ['new_recipient_page_visibility_amount_composite'],
+        }),
+      ]),
+    );
+    expect(state.assessment.score).toBe(85);
     expect(state.assessment.decision.level).toBe('block');
   });
 });

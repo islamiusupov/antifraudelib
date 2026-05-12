@@ -173,6 +173,104 @@ describe('DBankLiveFactorExtractingService', () => {
     ]);
   });
 
+  it('adds a step-up boost when a recipient is created in the current session with no previous use', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('recipient_created', 100, {
+          serverVerified: true,
+          createdInCurrentSession: true,
+          txCountToRecipient: 0,
+        }),
+      ]),
+    ).toEqual([
+      {
+        kind: 'new_recipient',
+        detected: true,
+        confidence: 1,
+        reasonCodes: ['new_recipient_in_flow'],
+        source: 'server',
+        metadata: {
+          serverVerified: true,
+          createdInCurrentSession: true,
+          txCountToRecipient: 0,
+        },
+      },
+      {
+        kind: 'composite_risk_boost',
+        detected: true,
+        contribution: 35,
+        maxContribution: 35,
+        reasonCodes: ['recipient_added_current_session_no_previous_use'],
+        source: 'server',
+        metadata: {
+          serverVerified: true,
+          createdInCurrentSession: true,
+          txCountToRecipient: 0,
+        },
+      },
+    ]);
+  });
+
+  it('extracts recipient velocity and velocity anomaly from three new recipients with different amounts in one hour', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('recipient_created', 100, { recipientId: 'r-1', amount: 1000 }),
+        event('recipient_created', 1000, { recipientId: 'r-2', amount: 2200 }),
+        event('recipient_created', 3000, { recipientId: 'r-3', amount: 3600 }),
+      ]),
+    ).toEqual([
+      {
+        kind: 'new_recipient',
+        detected: true,
+        confidence: 1,
+        reasonCodes: ['new_recipient_layering_pattern'],
+        source: 'server',
+        metadata: { recipientId: 'r-1', amount: 1000 },
+      },
+      {
+        kind: 'recipient_velocity',
+        detected: true,
+        confidence: 1,
+        reasonCodes: ['new_recipient_layering_pattern'],
+        source: 'server',
+      },
+      {
+        kind: 'velocity_anomaly',
+        detected: true,
+        confidence: 1,
+        reasonCodes: ['layering_different_amounts'],
+        source: 'server',
+      },
+    ]);
+  });
+
+  it('does not extract layering when new recipient amounts are the same', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('recipient_created', 100, { recipientId: 'r-1', amount: 1000 }),
+        event('recipient_created', 1000, { recipientId: 'r-2', amount: 1000 }),
+        event('recipient_created', 3000, { recipientId: 'r-3', amount: 1000 }),
+      ]),
+    ).toEqual([
+      {
+        kind: 'new_recipient',
+        detected: true,
+        confidence: 0.4,
+        reasonCodes: ['new_recipient_ui_only'],
+        source: 'server',
+        metadata: {
+          rawEventKind: 'recipient_created',
+        },
+      },
+    ]);
+  });
+
   it('ignores malformed server factor events without a string factor metadata value', () => {
     const service = new DBankLiveFactorExtractingService();
 
