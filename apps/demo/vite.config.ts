@@ -26,9 +26,15 @@ function dBankStaticAssetsPlugin(): Plugin {
   return {
     name: 'deepfraud-d-bank-static-assets',
     configureServer(server) {
-      server.middlewares.use('/d-bank', (request, response, next) => {
+      server.middlewares.use((request, response, next) => {
         const url = decodeURIComponent((request.url ?? '/').split('?')[0]);
-        const relativePath = url === '/' ? 'index.html' : url.replace(/^\/+/, '');
+        if (!url.startsWith('/d-bank')) {
+          next();
+          return;
+        }
+
+        const dBankPath = url.replace(/^\/d-bank(?=\/|$)/, '') || '/';
+        const relativePath = dBankPath === '/' ? 'index.html' : dBankPath.replace(/^\/+/, '');
         const filePath = resolve(dBankDist, relativePath);
 
         if (!filePath.startsWith(dBankDist) || !existsSync(filePath) || statSync(filePath).isDirectory()) {
