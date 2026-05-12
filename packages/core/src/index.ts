@@ -1,1 +1,12 @@
-export const corePackageName = '@deepcode/antifraud-core';
+export type { FactorContributionEntity } from './domain/entities/FactorContributionEntity';
+export type { RiskAssessmentEntity } from './domain/entities/RiskAssessmentEntity';
+export type { RiskDecisionEntity } from './domain/entities/RiskDecisionEntity';
+export type { RiskFactorEntity } from './domain/entities/RiskFactorEntity';
+export type { RiskReasonEntity } from './domain/entities/RiskReasonEntity';
+export type { RiskScoringRequestEntity } from './domain/entities/RiskScoringRequestEntity';
+export type { RiskDecisionLevel } from './domain/value-objects/RiskDecisionLevel';
+export type { RiskFactorKind, KnownRiskFactorKind } from './domain/value-objects/RiskFactorKind';
+export type { RiskFactorSource } from './domain/value-objects/RiskFactorSource';
+export type { RiskFactorStatus } from './domain/value-objects/RiskFactorStatus';
+export type { RiskScope } from './domain/value-objects/RiskScope';
+export { RiskScoringService } from './application/services/RiskScoringService';
