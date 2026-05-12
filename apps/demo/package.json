@@ -15,7 +15,7 @@
     "@deepcode/antifraud-dbank-adapter": "0.0.4",
     "@deepcode/antifraud-react": "0.0.4",
     "@deepcode/antifraud-test-harness": "0.0.4",
-    "d-bank": "^0.2.2",
+    "d-bank": "^0.2.6",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },
