@@ -431,6 +431,38 @@ describe('DeepFraudStateReducingService', () => {
     expect(state.assessment.score).toBe(85);
     expect(state.assessment.decision.level).toBe('block');
   });
+
+  it('steps up WDW-01 fast warning confirmation with the warning step-up boost', () => {
+    const service = new DeepFraudStateReducingService();
+
+    const state = service.createInitialState({
+      userId: 'user-1',
+      consent: 'behavioral',
+      factors: [
+        factor('warning_dwell', 18, 20, ['warning_dwell_too_short']),
+        factor('composite_risk_boost', 42, 42, ['warning_skip_step_up_floor']),
+      ],
+    });
+
+    expect(state.assessment.score).toBe(60);
+    expect(state.assessment.decision.level).toBe('step_up');
+  });
+
+  it('blocks WDW-03 three fast warning skips with the warning series boost', () => {
+    const service = new DeepFraudStateReducingService();
+
+    const state = service.createInitialState({
+      userId: 'user-1',
+      consent: 'behavioral',
+      factors: [
+        factor('warning_dwell', 20, 20, ['warning_skip_series_three_fast_confirmations']),
+        factor('composite_risk_boost', 65, 65, ['warning_skip_series_block_floor']),
+      ],
+    });
+
+    expect(state.assessment.score).toBe(85);
+    expect(state.assessment.decision.level).toBe('block');
+  });
 });
 
 function factor(

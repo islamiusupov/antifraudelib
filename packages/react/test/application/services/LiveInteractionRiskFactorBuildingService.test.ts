@@ -29,6 +29,7 @@ describe('LiveInteractionRiskFactorBuildingService', () => {
       ['copy_paste_amount', 20, 'copy_paste_amount'],
       ['form_fill_order', 20, 'multi_field_recipient_bulk_fill'],
       ['warning_dwell', 18, 'warning_dwell_too_short'],
+      ['composite_risk_boost', 42, 'warning_skip_step_up_floor'],
       ['page_visibility', 20, 'page_visibility_oscillation'],
       ['pointer_pattern', 16, 'pointer_pattern_anomaly'],
       ['keystroke_dynamics', 24, 'keystroke_dynamics_anomaly'],
@@ -50,6 +51,24 @@ describe('LiveInteractionRiskFactorBuildingService', () => {
         event('page_hidden', 1100),
       ]),
     ).toEqual([]);
+  });
+
+  it('maps three fast warning confirmations to a blocking warning series boost', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(
+      service.build([
+        event('warning_shown', 0),
+        event('warning_confirmed', 600),
+        event('warning_shown', 2000),
+        event('warning_confirmed', 2500),
+        event('warning_shown', 4000),
+        event('warning_confirmed', 4700),
+      ]).map((factor) => [factor.kind, factor.contribution, factor.reasonCodes?.[0]]),
+    ).toEqual([
+      ['warning_dwell', 20, 'warning_skip_series_three_fast_confirmations'],
+      ['composite_risk_boost', 65, 'warning_skip_series_block_floor'],
+    ]);
   });
 
   it('maps rapid nervous scroll to pointer pattern risk', () => {

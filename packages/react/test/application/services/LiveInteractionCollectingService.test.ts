@@ -412,6 +412,28 @@ describe('LiveInteractionCollectingService', () => {
       'rapid_scroll_observed',
     ]);
   });
+
+  it('captures scroll events while warning text is visible', () => {
+    const documentTarget = new FakeDocumentTarget();
+    const events: LiveInteractionEventEntity[] = [];
+
+    documentTarget.body.innerText = 'Fraud warning: suspicious transfer';
+    new LiveInteractionCollectingService().install({
+      target: { document: documentTarget },
+      now: () => 900,
+      onEvent: (event) => events.push(event),
+    });
+
+    documentTarget.dispatch('wheel', { deltaY: 20 });
+
+    expect(events).toEqual([
+      {
+        kind: 'warning_scrolled',
+        atMs: 900,
+        metadata: { source: 'wheel' },
+      },
+    ]);
+  });
 });
 
 class FakeDocumentTarget {

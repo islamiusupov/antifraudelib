@@ -1,8 +1,17 @@
-import { FactorContributionBuildingService, type RiskFactorEntity, type RiskSignalEntity } from '@deepcode/antifraud-core';
+import {
+  FactorContributionBuildingService,
+  WarningDwellSignalBuildingService,
+  type RiskFactorEntity,
+  type RiskSignalEntity,
+  type WarningDwellObservationEntity,
+} from '@deepcode/antifraud-core';
 import type { LiveInteractionEventEntity } from '../../domain/live/entities/LiveInteractionEventEntity';
 
 export class LiveInteractionRiskFactorBuildingService {
-  constructor(private readonly factorContributionBuildingService = new FactorContributionBuildingService()) {}
+  constructor(
+    private readonly factorContributionBuildingService = new FactorContributionBuildingService(),
+    private readonly warningDwellSignalBuildingService = new WarningDwellSignalBuildingService(),
+  ) {}
 
   build(events: LiveInteractionEventEntity[]): RiskFactorEntity[] {
     return this.factorContributionBuildingService.buildMany(this.signals(events));
@@ -14,9 +23,7 @@ export class LiveInteractionRiskFactorBuildingService {
     this.pushIfPresent(signals, events, 'recipient_pasted', 'copy_paste_recipient', ['copy_paste_recipient']);
     this.pushIfPresent(signals, events, 'amount_pasted', 'copy_paste_amount', ['copy_paste_amount']);
     this.pushIfPresent(signals, events, 'form_fill_order_observed', 'form_fill_order', ['multi_field_recipient_bulk_fill']);
-    if (this.hasFastWarningConfirmation(events)) {
-      signals.push(this.signal('warning_dwell', ['warning_dwell_too_short'], 0.9));
-    }
+    signals.push(...this.warningDwellSignalBuildingService.build(this.warningDwellObservations(events)));
     if (this.has(events, 'page_hidden') && this.has(events, 'page_visible')) {
       signals.push(this.signal('page_visibility', ['page_visibility_oscillation'], 0.8));
     }
@@ -65,11 +72,14 @@ export class LiveInteractionRiskFactorBuildingService {
     };
   }
 
-  private hasFastWarningConfirmation(events: LiveInteractionEventEntity[]): boolean {
-    const warningShown = events.find((event) => event.kind === 'warning_shown');
-    const warningConfirmed = events.find((event) => event.kind === 'warning_confirmed');
-    if (warningShown === undefined || warningConfirmed === undefined) return false;
-    return warningConfirmed.atMs - warningShown.atMs < 1000;
+  private warningDwellObservations(
+    events: LiveInteractionEventEntity[],
+  ): WarningDwellObservationEntity[] {
+    return events.filter((event): event is WarningDwellObservationEntity => (
+      event.kind === 'warning_shown' ||
+      event.kind === 'warning_confirmed' ||
+      event.kind === 'warning_scrolled'
+    ));
   }
 
   private has(events: LiveInteractionEventEntity[], kind: LiveInteractionEventEntity['kind']): boolean {

@@ -1,4 +1,8 @@
-import type { RiskSignalEntity } from '@deepcode/antifraud-core';
+import {
+  WarningDwellSignalBuildingService,
+  type RiskSignalEntity,
+  type WarningDwellObservationEntity,
+} from '@deepcode/antifraud-core';
 import type { DBankObservedEventEntity } from '../../domain/dbank/entities/DBankObservedEventEntity';
 
 const CURRENT_SESSION_NEW_RECIPIENT_BOOST = 35;
@@ -9,6 +13,8 @@ const SMALL_TEST_PAYMENT_MONITOR_BOOST = 5;
 const TEST_PAYMENT_TEXT_PATTERN = /(?:test[-_\s]?payment|probe|verification|micro[-_\s]?transfer|trial[-_\s]?payment)/i;
 
 export class DBankLiveFactorExtractingService {
+  constructor(private readonly warningDwellSignalBuildingService = new WarningDwellSignalBuildingService()) {}
+
   extract(events: DBankObservedEventEntity[]): RiskSignalEntity[] {
     const signals: RiskSignalEntity[] = [];
     const hasNewRecipientLayeringPattern = this.hasNewRecipientLayeringPattern(events);
@@ -70,15 +76,7 @@ export class DBankLiveFactorExtractingService {
         source: 'live',
       });
     }
-    if (this.hasFastWarningConfirmation(events)) {
-      signals.push({
-        kind: 'warning_dwell',
-        detected: true,
-        confidence: 0.9,
-        reasonCodes: ['warning_dwell_too_short'],
-        source: 'live',
-      });
-    }
+    signals.push(...this.warningDwellSignalBuildingService.build(this.warningDwellObservations(events)));
     if (this.hasEvent(events, 'form_fill_order_observed')) {
       signals.push({
         kind: 'form_fill_order',
@@ -431,10 +429,11 @@ export class DBankLiveFactorExtractingService {
     return null;
   }
 
-  private hasFastWarningConfirmation(events: DBankObservedEventEntity[]): boolean {
-    const warningShown = events.find((event) => event.kind === 'warning_shown');
-    const warningConfirmed = events.find((event) => event.kind === 'warning_confirmed');
-    if (warningShown === undefined || warningConfirmed === undefined) return false;
-    return warningConfirmed.atMs - warningShown.atMs < 1000;
+  private warningDwellObservations(events: DBankObservedEventEntity[]): WarningDwellObservationEntity[] {
+    return events.filter((event): event is WarningDwellObservationEntity => (
+      event.kind === 'warning_shown' ||
+      event.kind === 'warning_confirmed' ||
+      event.kind === 'warning_scrolled'
+    ));
   }
 }

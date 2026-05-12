@@ -105,6 +105,9 @@ export class LiveInteractionCollectingService {
         }
       };
       const handleWheel = (event: LiveInteractionDomEventEntity) => {
+        if (this.hasWarningTextInDocument(target)) {
+          this.emit(config, 'warning_scrolled', { source: 'wheel' });
+        }
         const delta = Math.max(Math.abs(event.deltaX ?? 0), Math.abs(event.deltaY ?? 0));
         if (delta < (config.rapidScrollDeltaThreshold ?? DEFAULT_RAPID_SCROLL_DELTA_THRESHOLD)) return;
         const atMs = this.now(config);
@@ -190,6 +193,11 @@ export class LiveInteractionCollectingService {
   private scanDocumentText(config: LiveInteractionCollectingConfigEntity, target: LiveInteractionTargetEntity): void {
     const text = target.document?.body?.innerText ?? target.document?.body?.textContent ?? '';
     this.scanText(config, text, 'dom');
+  }
+
+  private hasWarningTextInDocument(target: LiveInteractionTargetEntity): boolean {
+    const text = target.document?.body?.innerText ?? target.document?.body?.textContent ?? '';
+    return this.phishingTextPatternMatchingService.hasWarningText(text);
   }
 
   private scanText(config: LiveInteractionCollectingConfigEntity, text: string, source: string): void {

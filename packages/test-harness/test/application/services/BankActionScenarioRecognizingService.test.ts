@@ -54,11 +54,13 @@ describe('BankActionScenarioRecognizingService', () => {
       'concurrent_media',
       'new_recipient',
       'warning_dwell',
+      'composite_risk_boost',
     ]);
     expect(result.riskSignals.map((signal) => signal.kind)).toEqual([
       'concurrent_media',
       'new_recipient',
       'warning_dwell',
+      'composite_risk_boost',
     ]);
   });
 
@@ -83,6 +85,51 @@ describe('BankActionScenarioRecognizingService', () => {
 
     expect(result.recognitions.some((recognition) => recognition.factor === 'warning_dwell')).toBe(false);
     expect(result.status).toBe('no_match');
+  });
+
+  it('recognizes no-scroll warning dwell when confirmation is below the dwell minimum', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [action('warning_shown', 0), action('warning_confirmed', 600)],
+      catalog(),
+    );
+
+    expect(result.recognitions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          factor: 'warning_dwell',
+          reasonCodes: ['warning_dwell_too_short', 'warning_no_scroll_dwell_too_short'],
+        }),
+        expect.objectContaining({
+          factor: 'composite_risk_boost',
+          contribution: 42,
+          reasonCodes: ['warning_skip_step_up_floor'],
+        }),
+      ]),
+    );
+  });
+
+  it('recognizes a blocking warning dwell series after three fast confirmations', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('warning_shown', 0),
+        action('warning_confirmed', 600),
+        action('warning_shown', 2000),
+        action('warning_confirmed', 2500),
+        action('warning_shown', 4000),
+        action('warning_confirmed', 4700),
+      ],
+      catalog(),
+    );
+
+    expect(result.riskSignals.map((signal) => [signal.kind, signal.contribution, signal.reasonCodes?.[0]]))
+      .toEqual([
+        ['warning_dwell', undefined, 'warning_skip_series_three_fast_confirmations'],
+        ['composite_risk_boost', 65, 'warning_skip_series_block_floor'],
+      ]);
   });
 
   it.each([

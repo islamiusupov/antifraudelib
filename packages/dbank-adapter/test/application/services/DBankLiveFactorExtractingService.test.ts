@@ -49,6 +49,7 @@ describe('DBankLiveFactorExtractingService', () => {
     expect(
       service.extract([
         event('warning_shown', 1000),
+        event('warning_scrolled', 1200),
         event('warning_confirmed', 1400),
       ]),
     ).toEqual([
@@ -58,7 +59,59 @@ describe('DBankLiveFactorExtractingService', () => {
         confidence: 0.9,
         reasonCodes: ['warning_dwell_too_short'],
         source: 'live',
+        metadata: {
+          fastSkipCount: 1,
+          fastestDwellMs: 400,
+          minimumDwellMs: 1000,
+          noScrollCount: 0,
+        },
       },
+      {
+        kind: 'composite_risk_boost',
+        detected: true,
+        contribution: 42,
+        maxContribution: 42,
+        reasonCodes: ['warning_skip_step_up_floor'],
+        source: 'live',
+        metadata: {
+          fastSkipCount: 1,
+          fastestDwellMs: 400,
+          minimumDwellMs: 1000,
+          noScrollCount: 0,
+        },
+      },
+    ]);
+  });
+
+  it('extracts no-scroll warning dwell when a warning is skipped too fast without scrolling', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('warning_shown', 1000),
+        event('warning_confirmed', 1600),
+      ]).map((signal) => signal.reasonCodes),
+    ).toEqual([
+      ['warning_dwell_too_short', 'warning_no_scroll_dwell_too_short'],
+      ['warning_skip_step_up_floor'],
+    ]);
+  });
+
+  it('extracts a blocking boost when three warning screens are skipped too fast', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('warning_shown', 0),
+        event('warning_confirmed', 600),
+        event('warning_shown', 2000),
+        event('warning_confirmed', 2500),
+        event('warning_shown', 4000),
+        event('warning_confirmed', 4700),
+      ]).map((signal) => [signal.kind, signal.contribution, signal.reasonCodes?.[0]]),
+    ).toEqual([
+      ['warning_dwell', undefined, 'warning_skip_series_three_fast_confirmations'],
+      ['composite_risk_boost', 65, 'warning_skip_series_block_floor'],
     ]);
   });
 

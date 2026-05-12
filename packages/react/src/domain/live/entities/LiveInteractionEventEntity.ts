@@ -4,6 +4,7 @@ export type LiveInteractionEventEntity = {
     | 'amount_pasted'
     | 'warning_shown'
     | 'warning_confirmed'
+    | 'warning_scrolled'
     | 'form_fill_order_observed'
     | 'page_hidden'
     | 'page_visible'

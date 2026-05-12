@@ -1,4 +1,9 @@
-import type { RiskFactorKind, RiskSignalEntity } from '@deepcode/antifraud-core';
+import {
+  WarningDwellSignalBuildingService,
+  type RiskFactorKind,
+  type RiskSignalEntity,
+  type WarningDwellObservationEntity,
+} from '@deepcode/antifraud-core';
 import type { ParsedScenarioCatalogEntity } from '@deepcode/antifraud-scenario-catalog';
 import type { BankActionEntity } from '../../domain/harness/entities/BankActionEntity';
 import type { ScenarioRecognitionEntity } from '../../domain/harness/entities/ScenarioRecognitionEntity';
@@ -12,7 +17,10 @@ const SMALL_TEST_PAYMENT_MONITOR_BOOST = 5;
 const TEST_PAYMENT_TEXT_PATTERN = /(?:test[-_\s]?payment|probe|verification|micro[-_\s]?transfer|trial[-_\s]?payment)/i;
 
 export class BankActionScenarioRecognizingService {
-  constructor(private readonly compositeScenarioRecognizingService = new CompositeScenarioRecognizingService()) {}
+  constructor(
+    private readonly compositeScenarioRecognizingService = new CompositeScenarioRecognizingService(),
+    private readonly warningDwellSignalBuildingService = new WarningDwellSignalBuildingService(),
+  ) {}
 
   recognize(actions: BankActionEntity[], catalog: ParsedScenarioCatalogEntity): ScenarioRecognitionResultEntity {
     const recognitions = this.recognizeFactors(actions, catalog);
@@ -86,9 +94,7 @@ export class BankActionScenarioRecognizingService {
     if (this.hasAction(actions, 'amount_pasted')) {
       recognitions.push(this.createRecognition('copy_paste_amount', 1, ['copy_paste_amount'], catalog));
     }
-    if (this.hasFastWarningConfirmation(actions)) {
-      recognitions.push(this.createRecognition('warning_dwell', 0.9, ['warning_dwell_too_short'], catalog));
-    }
+    recognitions.push(...this.warningDwellRecognitions(actions, catalog));
     if (this.hasAction(actions, 'form_fill_order_observed')) {
       recognitions.push(this.createRecognition('form_fill_order', 1, ['multi_field_recipient_bulk_fill'], catalog));
     }
@@ -311,11 +317,31 @@ export class BankActionScenarioRecognizingService {
     return null;
   }
 
-  private hasFastWarningConfirmation(actions: BankActionEntity[]): boolean {
-    const warningShown = actions.find((action) => action.kind === 'warning_shown');
-    const warningConfirmed = actions.find((action) => action.kind === 'warning_confirmed');
-    if (warningShown === undefined || warningConfirmed === undefined) return false;
-    return warningConfirmed.atMs - warningShown.atMs < 1000;
+  private warningDwellRecognitions(
+    actions: BankActionEntity[],
+    catalog: ParsedScenarioCatalogEntity,
+  ): ScenarioRecognitionEntity[] {
+    return this.warningDwellSignalBuildingService
+      .build(this.warningDwellObservations(actions))
+      .map((signal) => this.createRecognition(
+        signal.kind,
+        signal.confidence ?? 1,
+        signal.reasonCodes ?? [signal.kind],
+        catalog,
+        {
+          contribution: signal.contribution,
+          maxContribution: signal.maxContribution,
+          metadata: signal.metadata,
+        },
+      ));
+  }
+
+  private warningDwellObservations(actions: BankActionEntity[]): WarningDwellObservationEntity[] {
+    return actions.filter((action): action is WarningDwellObservationEntity => (
+      action.kind === 'warning_shown' ||
+      action.kind === 'warning_confirmed' ||
+      action.kind === 'warning_scrolled'
+    ));
   }
 
   private unique<T>(items: T[]): T[] {
