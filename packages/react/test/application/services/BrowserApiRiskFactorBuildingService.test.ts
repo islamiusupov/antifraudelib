@@ -10,6 +10,7 @@ describe('BrowserApiRiskFactorBuildingService', () => {
       service.build([
         event('media_requested', { audio: true, video: false }),
         event('clipboard_write', { hasOtpPattern: true }),
+        event('clipboard_read', { hasOtpPattern: false }),
         event('fetch_requested', { hasTokenLikePayload: true }, false),
         event('xhr_requested', { hasTokenLikePayload: true }, true),
       ]),
@@ -27,6 +28,12 @@ describe('BrowserApiRiskFactorBuildingService', () => {
         metadata: { eventCount: 1 },
       }),
       expect.objectContaining({
+        kind: 'programmatic_clipboard_read',
+        contribution: 20,
+        reasonCodes: ['programmatic_clipboard_read'],
+        metadata: { eventCount: 1 },
+      }),
+      expect.objectContaining({
         kind: 'recent_token_injection',
         contribution: 40,
         reasonCodes: ['network_token_exfiltration'],
@@ -35,13 +42,13 @@ describe('BrowserApiRiskFactorBuildingService', () => {
     ]);
   });
 
-  it('ignores allowed network events and ordinary clipboard text', () => {
+  it('ignores allowed network events and ordinary clipboard writes', () => {
     const service = new BrowserApiRiskFactorBuildingService();
 
     expect(
       service.build([
         event('fetch_requested', { hasTokenLikePayload: true }, true),
-        event('clipboard_read', { hasOtpPattern: false }),
+        event('clipboard_write', { hasOtpPattern: false }),
       ]),
     ).toEqual([]);
   });

@@ -41,6 +41,20 @@ export class BrowserApiRiskFactorBuildingService {
       });
     }
 
+    const clipboardReadEvents = events.filter((event) => event.kind === 'clipboard_read');
+    if (clipboardReadEvents.length > 0) {
+      signals.push({
+        kind: 'programmatic_clipboard_read',
+        detected: true,
+        confidence: 1,
+        reasonCodes: ['programmatic_clipboard_read'],
+        source: 'live',
+        metadata: {
+          eventCount: clipboardReadEvents.length,
+        },
+      });
+    }
+
     const networkTokenEvents = events.filter((event) =>
       (event.kind === 'fetch_requested' || event.kind === 'xhr_requested') &&
       event.allowed === false &&

@@ -34,6 +34,7 @@ export type KnownRiskFactorKind =
   | 'parallel_session'
   | 'incoming_call_correlation'
   | 'clipboard_otp_pattern'
+  | 'programmatic_clipboard_read'
   | 'focus_loss_during_input'
   | 'form_fill_order'
   | 'back_navigation_pattern'

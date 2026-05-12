@@ -234,4 +234,36 @@ describe('DeepFraudStateReducingService', () => {
     expect(verifiedState.assessment.score).toBe(45);
     expect(verifiedState.assessment.decision.level).toBe('monitor');
   });
+
+  it('steps up when programmatic clipboard read is followed by recipient auto-fill', () => {
+    const service = new DeepFraudStateReducingService();
+    const initialState = service.createInitialState({
+      userId: 'user-1',
+      consent: 'behavioral',
+      factors: [],
+    });
+    const sessionState = service.replaceScopeFactors(initialState, 'session', [
+      {
+        kind: 'programmatic_clipboard_read',
+        contribution: 20,
+        maxContribution: 20,
+        status: 'ok',
+        reasonCodes: ['programmatic_clipboard_read'],
+        source: 'live',
+      },
+    ]);
+    const transactionState = service.replaceScopeFactors(sessionState, 'transaction', [
+      {
+        kind: 'copy_paste_recipient',
+        contribution: 40,
+        maxContribution: 40,
+        status: 'ok',
+        reasonCodes: ['copy_paste_recipient'],
+        source: 'live',
+      },
+    ]);
+
+    expect(transactionState.assessment.score).toBe(60);
+    expect(transactionState.assessment.decision.level).toBe('step_up');
+  });
 });

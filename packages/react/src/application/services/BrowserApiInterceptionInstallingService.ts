@@ -46,7 +46,7 @@ export class BrowserApiInterceptionInstallingService {
           hasTokenLikePayload: this.browserTokenPatternMatchingService.hasTokenLikePayload([url, input, init]),
         },
       });
-      return originalFetch(input, init);
+      return originalFetch.call(target, input, init);
     };
 
     return () => {

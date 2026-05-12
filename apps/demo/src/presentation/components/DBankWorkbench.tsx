@@ -4,12 +4,16 @@ import {
   DecisionBadge,
   DeepFraud,
   DeepFraudRoot,
+  BrowserApiInterceptionInstallingService,
+  BrowserApiRiskFactorBuildingService,
   LiveInteractionCollectingService,
   LiveInteractionRiskFactorBuildingService,
   ReasonCodeList,
   RiskFactorList,
   RiskMeter,
   VisualChallengeGate,
+  type BrowserApiInterceptionEventEntity,
+  type BrowserApiInterceptionTargetEntity,
   type LiveInteractionEventEntity,
   type LiveInteractionTargetEntity,
 } from '@deepcode/antifraud-react';
@@ -30,10 +34,13 @@ export type DBankWorkbenchProps = {
 export function DBankWorkbench({ config }: DBankWorkbenchProps) {
   const dBankBridgeMessageParsingService = useMemo(() => new DBankBridgeMessageParsingService(), []);
   const dBankEventRiskFactorsBuildingService = useMemo(() => new DBankEventRiskFactorsBuildingService(), []);
+  const browserApiInterceptionInstallingService = useMemo(() => new BrowserApiInterceptionInstallingService(), []);
+  const browserApiRiskFactorBuildingService = useMemo(() => new BrowserApiRiskFactorBuildingService(), []);
   const liveInteractionCollectingService = useMemo(() => new LiveInteractionCollectingService(), []);
   const liveInteractionRiskFactorBuildingService = useMemo(() => new LiveInteractionRiskFactorBuildingService(), []);
   const iframeCollectorCleanup = useRef<(() => void) | undefined>(undefined);
   const [observedEvents, setObservedEvents] = useState<Array<TimedEventEntity<DBankObservedEventEntity>>>([]);
+  const [iframeBrowserApiEvents, setIframeBrowserApiEvents] = useState<Array<TimedEventEntity<BrowserApiInterceptionEventEntity>>>([]);
   const [iframeLiveEvents, setIframeLiveEvents] = useState<Array<TimedEventEntity<LiveInteractionEventEntity>>>([]);
   const [clockMs, setClockMs] = useState(() => Date.now());
   const activeObservedEvents = useMemo(
@@ -44,12 +51,24 @@ export function DBankWorkbench({ config }: DBankWorkbenchProps) {
     () => activeEvents(iframeLiveEvents, clockMs, DEMO_SIGNAL_TTL_MS),
     [clockMs, iframeLiveEvents],
   );
+  const activeIframeBrowserApiEvents = useMemo(
+    () => activeEvents(iframeBrowserApiEvents, clockMs, DEMO_SIGNAL_TTL_MS),
+    [clockMs, iframeBrowserApiEvents],
+  );
   const observedFactors = useMemo(
     () => [
       ...dBankEventRiskFactorsBuildingService.build(activeObservedEvents),
       ...liveInteractionRiskFactorBuildingService.build(activeIframeLiveEvents),
+      ...browserApiRiskFactorBuildingService.build(activeIframeBrowserApiEvents),
     ],
-    [activeIframeLiveEvents, activeObservedEvents, dBankEventRiskFactorsBuildingService, liveInteractionRiskFactorBuildingService],
+    [
+      activeIframeBrowserApiEvents,
+      activeIframeLiveEvents,
+      activeObservedEvents,
+      browserApiRiskFactorBuildingService,
+      dBankEventRiskFactorsBuildingService,
+      liveInteractionRiskFactorBuildingService,
+    ],
   );
 
   useEffect(() => {
@@ -72,20 +91,36 @@ export function DBankWorkbench({ config }: DBankWorkbenchProps) {
     (iframe: HTMLIFrameElement | null) => {
       iframeCollectorCleanup.current?.();
       iframeCollectorCleanup.current = undefined;
+      setIframeBrowserApiEvents([]);
       setIframeLiveEvents([]);
 
-      const target = thisFrameTarget(iframe);
-      if (target === undefined) return;
-
-      iframeCollectorCleanup.current = liveInteractionCollectingService.install({
-        target,
-        fastKeyIntervalMs: 80,
-        rapidScrollWindowMs: 900,
-        rapidScrollMinimumEvents: 3,
-        onEvent: (event) => setIframeLiveEvents((currentEvents) => [...currentEvents, timedEvent(event)]),
-      });
+      const liveTarget = thisFrameLiveTarget(iframe);
+      const browserTarget = thisFrameBrowserTarget(iframe);
+      const cleanups: Array<() => void> = [];
+      if (liveTarget !== undefined) {
+        cleanups.push(
+          liveInteractionCollectingService.install({
+            target: liveTarget,
+            fastKeyIntervalMs: 80,
+            rapidScrollWindowMs: 900,
+            rapidScrollMinimumEvents: 3,
+            onEvent: (event) => setIframeLiveEvents((currentEvents) => [...currentEvents, timedEvent(event)]),
+          }),
+        );
+      }
+      if (browserTarget !== undefined) {
+        cleanups.push(
+          browserApiInterceptionInstallingService.install({
+            target: browserTarget,
+            onEvent: (event) => setIframeBrowserApiEvents((currentEvents) => [...currentEvents, timedEvent(event)]),
+          }),
+        );
+      }
+      iframeCollectorCleanup.current = () => {
+        cleanups.reverse().forEach((cleanup) => cleanup());
+      };
     },
-    [liveInteractionCollectingService],
+    [browserApiInterceptionInstallingService, liveInteractionCollectingService],
   );
 
   return (
@@ -148,7 +183,7 @@ function activeEvents<TEvent>(
     .map((event) => event.event);
 }
 
-function thisFrameTarget(iframe: HTMLIFrameElement | null): LiveInteractionTargetEntity | undefined {
+function thisFrameLiveTarget(iframe: HTMLIFrameElement | null): LiveInteractionTargetEntity | undefined {
   try {
     const frameWindow = iframe?.contentWindow;
     const frameDocument = frameWindow?.document;
@@ -161,6 +196,17 @@ function thisFrameTarget(iframe: HTMLIFrameElement | null): LiveInteractionTarge
       window: frameWindow as unknown as LiveInteractionTargetEntity['window'],
       MutationObserver: frameRecord.MutationObserver as LiveInteractionTargetEntity['MutationObserver'],
     };
+  } catch {
+    return undefined;
+  }
+}
+
+function thisFrameBrowserTarget(iframe: HTMLIFrameElement | null): BrowserApiInterceptionTargetEntity | undefined {
+  try {
+    const frameWindow = iframe?.contentWindow;
+    if (frameWindow === undefined || frameWindow === null) return undefined;
+
+    return frameWindow as unknown as BrowserApiInterceptionTargetEntity;
   } catch {
     return undefined;
   }
