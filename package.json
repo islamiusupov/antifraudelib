@@ -18,6 +18,8 @@
     "scenarios:validate": "npm run build -w @deepcode/antifraud-scenario-catalog && node scripts/validate-scenarios.cjs"
   },
   "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "typescript": "^5.5.3",
     "vitest": "^4.1.6"
   },
