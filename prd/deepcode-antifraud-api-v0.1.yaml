@@ -1,0 +1,975 @@
+openapi: 3.1.0
+
+info:
+  title: DeepCode.Antifraud — Server-Side Helpers API
+  version: 0.1.0
+  summary: Контракт между @deepcode/antifraud SDK и бэкендом банка для серверных factor evaluations, recall question challenges и decision reporting.
+  description: |
+    # Overview
+
+    The DeepCode.Antifraud SDK runs primarily on the client. Approximately 15 of 45 factors
+    require server-side context (transaction history, recipient graphs, IP reputation, AML
+    watchlists, account age, etc.) and are exposed through this API.
+
+    **Implementation:** Each bank implements this API on their own backend. The SDK on the
+    client invokes endpoints via configured `ServerHelper` slots (see PRD §7).
+
+    **Privacy posture:** The SDK sends **only metadata** by default. Raw user data (IBAN,
+    phone numbers, names) is hashed (SHA-256) on the client before transit. Banks resolve
+    hashes against their internal data store. No raw PII crosses the SDK→bank boundary.
+
+    **Latency budget:** Each endpoint should respond within 250 ms (p95) to fit the overall
+    1-second SLA. Batch evaluation (`POST /factors:evaluate`) races individual factor lookups
+    in parallel and returns whatever completed within the configured `timeoutMs`.
+
+    **Failure modes:** Per the SDK's `ServerHelper.failureMode` setting, an endpoint timeout
+    or 5xx error can be treated as `ignore`, `fail-open` (allow), or `fail-closed` (block).
+    Banks should design endpoints for graceful degradation under load.
+
+    # Server-Side Factors Covered
+
+    | Factor | Endpoint |
+    |---|---|
+    | `new_recipient` | POST /factors:evaluate |
+    | `amount_anomaly` | POST /factors:evaluate |
+    | `time_of_day_anomaly` | POST /factors:evaluate |
+    | `velocity_anomaly` | POST /factors:evaluate |
+    | `recipient_velocity` | POST /factors:evaluate |
+    | `recipient_account_age` | POST /factors:evaluate |
+    | `geoip_jump` | POST /factors:evaluate |
+    | `time_since_login` | POST /factors:evaluate |
+    | `tls_fingerprint` | POST /factors:evaluate |
+    | `request_idempotency_breach` | POST /factors:evaluate |
+    | `recent_password_change` | POST /factors:evaluate |
+    | `recent_contact_change` | POST /factors:evaluate |
+    | `device_id_per_user_ratio` | POST /factors:evaluate |
+    | `shared_recipient_graph` | POST /factors:evaluate |
+    | `incoming_call_correlation` | POST /factors:evaluate |
+
+    Plus: recall question challenges, decision reporting, health check.
+  contact:
+    name: DeepCode.AI
+    url: https://skobeltsyn.com
+    email: hello@deep-code.ai
+  license:
+    name: API specification under Apache-2.0; bank implementations are bank-licensed
+    url: https://www.apache.org/licenses/LICENSE-2.0
+
+servers:
+  - url: https://antifraud.{bank}.com/v1
+    description: Bank-hosted production endpoint
+    variables:
+      bank:
+        default: example
+        description: Bank subdomain
+  - url: https://antifraud-sandbox.{bank}.com/v1
+    description: Sandbox / staging
+    variables:
+      bank:
+        default: example
+
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+
+tags:
+  - name: Factors
+    description: Batch evaluation of server-side fraud factors
+  - name: Challenges
+    description: Challenge content generation (recall questions from real history)
+  - name: Decisions
+    description: Decision reporting for audit and SIEM
+  - name: Health
+    description: Liveness and readiness checks
+
+paths:
+
+  /factors:evaluate:
+    post:
+      summary: Batch evaluate server-side factors
+      description: |
+        Evaluate one or more server-side fraud factors for a transaction context.
+
+        The client SDK invokes this endpoint once per transaction step (typically on
+        scope mount and on critical user actions). The server evaluates each requested
+        factor in parallel and returns per-factor contributions.
+
+        **Recommended timeout** (SDK side): 500 ms. **Server SLA**: p95 ≤ 250 ms with
+        at least 12 of 15 factors evaluated successfully.
+
+        Unknown factor kinds are returned with `status: "unknown_factor"` and contribution 0.
+      operationId: evaluateFactors
+      tags: [Factors]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluationRequest'
+            examples:
+              seip_scenario:
+                summary: SEIP scenario B (бабушку разводят)
+                value:
+                  transactionId: 4f2d3c9e-1a8b-4c7d-9e8f-2a1b3c4d5e6f
+                  userId: usr_baba_maria_001
+                  sessionId: sess_2026_05_11_14_23_45
+                  context:
+                    timestamp: '2026-05-11T14:23:45Z'
+                    deviceFingerprintHash: a3b2c1d0e9f8...
+                    ipAddress: 92.245.117.42
+                    userAgent: 'Mozilla/5.0 (Windows NT 10.0...) Chrome/124.0'
+                  factors:
+                    - kind: new_recipient
+                      recipientHash: sha256:7b1c4e9a...
+                      cooldownHours: 24
+                    - kind: amount_anomaly
+                      amount: 87000
+                      currency: RUB
+                      percentile: 95
+                    - kind: geoip_jump
+                      maxKmPerHour: 800
+                    - kind: recipient_account_age
+                      recipientHash: sha256:7b1c4e9a...
+                      minDays: 30
+                    - kind: recent_password_change
+                      lookbackHours: 72
+      responses:
+        '200':
+          description: Evaluation completed (possibly partial — see per-factor status)
+          headers:
+            X-RateLimit-Remaining:
+              schema: { type: integer }
+            X-RateLimit-Reset:
+              schema: { type: integer, description: Unix timestamp }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationResponse'
+              examples:
+                seip_response:
+                  summary: SEIP scenario B response
+                  value:
+                    transactionId: 4f2d3c9e-1a8b-4c7d-9e8f-2a1b3c4d5e6f
+                    correlationId: corr_a1b2c3d4
+                    elapsedMs: 187
+                    evaluations:
+                      - kind: new_recipient
+                        status: ok
+                        contribution: 25
+                        maxContribution: 25
+                        reasonCodes: [new_recipient_in_cooldown, first_tx_to_recipient]
+                        metadata:
+                          recipientAgeHours: 0.5
+                          txCountToRecipient: 0
+                      - kind: amount_anomaly
+                        status: ok
+                        contribution: 28
+                        maxContribution: 30
+                        reasonCodes: [amount_above_p95]
+                        metadata:
+                          userP95Amount: 4500
+                          actualAmount: 87000
+                      - kind: geoip_jump
+                        status: ok
+                        contribution: 0
+                        maxContribution: 30
+                        reasonCodes: []
+                      - kind: recipient_account_age
+                        status: ok
+                        contribution: 20
+                        maxContribution: 20
+                        reasonCodes: [recipient_account_under_30_days]
+                        metadata:
+                          accountAgeDays: 8
+                      - kind: recent_password_change
+                        status: ok
+                        contribution: 0
+                        maxContribution: 35
+                        reasonCodes: []
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /challenges:recall-question:
+    post:
+      summary: Generate recall question challenge
+      description: |
+        Generate a multiple-choice recall question about a real recent transaction.
+        Used during step_up challenge to verify that the person at the device knows
+        the user's actual transaction history (something a scammer coaching the
+        victim cannot know).
+
+        The server returns 3 real transactions from the last `lookbackDays` + 1 plausible
+        distractor. The `correctIndex` indicates the right answer. The SDK shuffles
+        the options client-side and reports back via `POST /decisions`.
+
+        **Privacy note:** If user has no recent transactions, server returns
+        `{ "status": "insufficient_history" }` and the SDK falls back to alternate
+        challenge or `block`.
+      operationId: requestRecallQuestion
+      tags: [Challenges]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecallQuestionRequest'
+            examples:
+              standard:
+                summary: Standard recall request
+                value:
+                  userId: usr_baba_maria_001
+                  lookbackDays: 30
+                  excludeRecipientHashes:
+                    - sha256:7b1c4e9a...
+      responses:
+        '200':
+          description: Question generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecallQuestionResponse'
+              examples:
+                standard:
+                  summary: Recall question response
+                  value:
+                    challengeId: chal_a1b2c3
+                    kind: recall_question
+                    question: Какую сумму вы переводили в Магнит на прошлой неделе?
+                    options:
+                      - 1 200 ₽
+                      - 2 800 ₽
+                      - 4 100 ₽
+                      - Не переводил
+                    correctIndex: 2
+                    expiresAt: '2026-05-11T14:25:45Z'
+                insufficient_history:
+                  summary: User has no recent history
+                  value:
+                    status: insufficient_history
+                    fallbackChallenge: face_count_check
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /decisions:
+    post:
+      summary: Report final fraud decision
+      description: |
+        Report the SDK's final decision (and the user's challenge response, if any)
+        back to the bank for audit logging, SIEM integration, and threshold tuning.
+
+        This is a fire-and-forget endpoint — the SDK does not wait for response to
+        proceed with user-facing UX. Failures here should not block transactions.
+      operationId: reportDecision
+      tags: [Decisions]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionReport'
+            examples:
+              block:
+                summary: Transaction blocked after failed visual challenge
+                value:
+                  transactionId: 4f2d3c9e-1a8b-4c7d-9e8f-2a1b3c4d5e6f
+                  userId: usr_baba_maria_001
+                  decision:
+                    level: block
+                    score: 87
+                    reasons:
+                      - { code: shoulder_surfing_detected, contribution: 50 }
+                      - { code: copy_paste_recipient, contribution: 40 }
+                      - { code: new_recipient_in_cooldown, contribution: 25 }
+                      - { code: amount_above_p95, contribution: 28 }
+                    challengeResults:
+                      - { kind: face_count_check, result: fail, detail: faces_detected=2 }
+                    timestamp: '2026-05-11T14:24:12Z'
+      responses:
+        '202':
+          description: Decision accepted for processing
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /health:
+    get:
+      summary: Health check
+      description: |
+        Returns 200 OK if all server-side factors are operational. 503 if one or
+        more factor evaluators are degraded — the SDK can use this to decide
+        whether to skip server-side factors entirely for the current session.
+      operationId: getHealth
+      tags: [Health]
+      security: []
+      responses:
+        '200':
+          description: All factor evaluators healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              examples:
+                healthy:
+                  value:
+                    status: ok
+                    factors:
+                      new_recipient: ok
+                      amount_anomaly: ok
+                      time_of_day_anomaly: ok
+                      velocity_anomaly: ok
+                      recipient_velocity: ok
+                      recipient_account_age: ok
+                      geoip_jump: ok
+                      time_since_login: ok
+                      tls_fingerprint: ok
+                      request_idempotency_breach: ok
+                      recent_password_change: ok
+                      recent_contact_change: ok
+                      device_id_per_user_ratio: ok
+                      shared_recipient_graph: ok
+                      incoming_call_correlation: ok
+                    version: '1.4.2'
+        '503':
+          description: One or more factors degraded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              examples:
+                degraded:
+                  value:
+                    status: degraded
+                    factors:
+                      new_recipient: ok
+                      shared_recipient_graph: degraded
+                      device_id_per_user_ratio: down
+                      # ...
+                    version: '1.4.2'
+
+components:
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-DeepCode-API-Key
+      description: |
+        Static API key issued by the bank to the SDK integrator. The SDK injects this
+        on every request. For production, rotate per environment.
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        OAuth2 / OIDC bearer token issued by bank's auth service. Preferred over
+        static API key in production. Token contains scope `antifraud:read` for
+        evaluation, `antifraud:write` for decisions.
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        format: uuid
+      description: |
+        Client-generated UUID for idempotent retries. Server returns the same response
+        for repeated requests with the same key within 24 hours.
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Trace ID for end-to-end request correlation across SDK → backend → SIEM.
+
+  responses:
+    BadRequest:
+      description: Malformed request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Missing or invalid credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Authenticated but not authorized for this resource
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    RateLimited:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          schema: { type: integer, description: Seconds until retry allowed }
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: Server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ServiceUnavailable:
+      description: One or more factor evaluators are down
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+
+    # ============================================================
+    # Common types
+    # ============================================================
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              examples: [invalid_request, user_not_found, factor_unavailable, rate_limited]
+            message: { type: string }
+            details:
+              type: object
+              additionalProperties: true
+
+    DecisionLevel:
+      type: string
+      enum: [ok, monitor, step_up, block]
+      description: |
+        Final decision level produced by SDK's rule engine.
+        See PRD §9 for thresholds.
+
+    FactorStatus:
+      type: string
+      enum: [ok, unknown_factor, timeout, error, insufficient_data]
+
+    ReasonCode:
+      type: string
+      description: |
+        Machine-readable reason code. Stable identifier; banks can map these
+        to localized user-facing messages for transaction history annotations.
+        Examples: new_recipient_in_cooldown, amount_above_p95, geoip_impossible_travel.
+
+    Currency:
+      type: string
+      description: ISO 4217 currency code
+      examples: [RUB, USD, EUR, UZS, KZT]
+
+    ContextEnvelope:
+      type: object
+      required: [timestamp]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        deviceFingerprintHash:
+          type: string
+          description: SHA-256 of ThumbmarkJS hash
+        ipAddress:
+          type: string
+          format: ipv4
+        userAgent:
+          type: string
+        clientHints:
+          type: object
+          additionalProperties: { type: string }
+          description: navigator.userAgentData fields (Sec-CH-UA family)
+
+    # ============================================================
+    # Evaluation envelope (request/response)
+    # ============================================================
+
+    EvaluationRequest:
+      type: object
+      required: [transactionId, userId, factors]
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+        sessionId:
+          type: string
+        context:
+          $ref: '#/components/schemas/ContextEnvelope'
+        factors:
+          type: array
+          minItems: 1
+          maxItems: 15
+          items:
+            $ref: '#/components/schemas/FactorRequest'
+
+    EvaluationResponse:
+      type: object
+      required: [transactionId, evaluations, elapsedMs]
+      properties:
+        transactionId: { type: string, format: uuid }
+        correlationId: { type: string }
+        elapsedMs: { type: integer }
+        evaluations:
+          type: array
+          items:
+            $ref: '#/components/schemas/FactorResult'
+
+    FactorResult:
+      type: object
+      required: [kind, status, contribution, maxContribution]
+      properties:
+        kind: { $ref: '#/components/schemas/FactorKind' }
+        status: { $ref: '#/components/schemas/FactorStatus' }
+        contribution:
+          type: number
+          minimum: 0
+        maxContribution:
+          type: number
+          minimum: 0
+        reasonCodes:
+          type: array
+          items: { $ref: '#/components/schemas/ReasonCode' }
+        metadata:
+          type: object
+          description: Factor-specific evidence (e.g., recipientAgeHours, userP95Amount). Schemas in §Factor results.
+          additionalProperties: true
+
+    FactorKind:
+      type: string
+      enum:
+        - new_recipient
+        - amount_anomaly
+        - time_of_day_anomaly
+        - velocity_anomaly
+        - recipient_velocity
+        - recipient_account_age
+        - geoip_jump
+        - time_since_login
+        - tls_fingerprint
+        - request_idempotency_breach
+        - recent_password_change
+        - recent_contact_change
+        - device_id_per_user_ratio
+        - shared_recipient_graph
+        - incoming_call_correlation
+
+    # ============================================================
+    # FactorRequest (oneOf with discriminator)
+    # ============================================================
+
+    FactorRequest:
+      oneOf:
+        - $ref: '#/components/schemas/NewRecipientRequest'
+        - $ref: '#/components/schemas/AmountAnomalyRequest'
+        - $ref: '#/components/schemas/TimeOfDayAnomalyRequest'
+        - $ref: '#/components/schemas/VelocityAnomalyRequest'
+        - $ref: '#/components/schemas/RecipientVelocityRequest'
+        - $ref: '#/components/schemas/RecipientAccountAgeRequest'
+        - $ref: '#/components/schemas/GeoIPJumpRequest'
+        - $ref: '#/components/schemas/TimeSinceLoginRequest'
+        - $ref: '#/components/schemas/TLSFingerprintRequest'
+        - $ref: '#/components/schemas/RequestIdempotencyBreachRequest'
+        - $ref: '#/components/schemas/RecentPasswordChangeRequest'
+        - $ref: '#/components/schemas/RecentContactChangeRequest'
+        - $ref: '#/components/schemas/DeviceIdPerUserRatioRequest'
+        - $ref: '#/components/schemas/SharedRecipientGraphRequest'
+        - $ref: '#/components/schemas/IncomingCallCorrelationRequest'
+      discriminator:
+        propertyName: kind
+        mapping:
+          new_recipient: '#/components/schemas/NewRecipientRequest'
+          amount_anomaly: '#/components/schemas/AmountAnomalyRequest'
+          time_of_day_anomaly: '#/components/schemas/TimeOfDayAnomalyRequest'
+          velocity_anomaly: '#/components/schemas/VelocityAnomalyRequest'
+          recipient_velocity: '#/components/schemas/RecipientVelocityRequest'
+          recipient_account_age: '#/components/schemas/RecipientAccountAgeRequest'
+          geoip_jump: '#/components/schemas/GeoIPJumpRequest'
+          time_since_login: '#/components/schemas/TimeSinceLoginRequest'
+          tls_fingerprint: '#/components/schemas/TLSFingerprintRequest'
+          request_idempotency_breach: '#/components/schemas/RequestIdempotencyBreachRequest'
+          recent_password_change: '#/components/schemas/RecentPasswordChangeRequest'
+          recent_contact_change: '#/components/schemas/RecentContactChangeRequest'
+          device_id_per_user_ratio: '#/components/schemas/DeviceIdPerUserRatioRequest'
+          shared_recipient_graph: '#/components/schemas/SharedRecipientGraphRequest'
+          incoming_call_correlation: '#/components/schemas/IncomingCallCorrelationRequest'
+
+    # ============================================================
+    # Per-factor request schemas (15 factors)
+    # ============================================================
+
+    NewRecipientRequest:
+      type: object
+      required: [kind, recipientHash]
+      properties:
+        kind: { type: string, enum: [new_recipient] }
+        recipientHash:
+          type: string
+          description: SHA-256 of canonical recipient identifier (IBAN or phone or card-last-4+name)
+        cooldownHours:
+          type: integer
+          default: 24
+          minimum: 1
+          maximum: 720
+
+    AmountAnomalyRequest:
+      type: object
+      required: [kind, amount, currency]
+      properties:
+        kind: { type: string, enum: [amount_anomaly] }
+        amount: { type: number, minimum: 0 }
+        currency: { $ref: '#/components/schemas/Currency' }
+        percentile:
+          type: integer
+          default: 95
+          minimum: 50
+          maximum: 99
+          description: Trigger if amount > this percentile of user's last 90d history
+
+    TimeOfDayAnomalyRequest:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [time_of_day_anomaly] }
+        userLocalHour:
+          type: integer
+          minimum: 0
+          maximum: 23
+          description: |
+            Hour in user's local timezone. If omitted, server uses request timestamp + bank's
+            known user TZ.
+
+    VelocityAnomalyRequest:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [velocity_anomaly] }
+        windowMs:
+          type: integer
+          default: 300000
+          minimum: 1000
+        maxActions:
+          type: integer
+          default: 10
+        actionType:
+          type: string
+          enum: [transaction, login, recipient_added, password_change, any]
+          default: any
+
+    RecipientVelocityRequest:
+      type: object
+      required: [kind, recipientHash]
+      properties:
+        kind: { type: string, enum: [recipient_velocity] }
+        recipientHash: { type: string }
+        lookbackHours:
+          type: integer
+          default: 24
+          minimum: 1
+          maximum: 168
+        # Looks at incoming velocity to the recipient account from ANY user (mule pattern)
+
+    RecipientAccountAgeRequest:
+      type: object
+      required: [kind, recipientHash]
+      properties:
+        kind: { type: string, enum: [recipient_account_age] }
+        recipientHash: { type: string }
+        minDays:
+          type: integer
+          default: 30
+          minimum: 1
+          description: Trigger if recipient account opened fewer than minDays ago
+
+    GeoIPJumpRequest:
+      type: object
+      required: [kind, currentIp]
+      properties:
+        kind: { type: string, enum: [geoip_jump] }
+        currentIp:
+          type: string
+          format: ipv4
+        previousIp:
+          type: string
+          format: ipv4
+          description: Optional — if omitted server uses last known IP from session history
+        maxKmPerHour:
+          type: number
+          default: 800
+          description: Max plausible travel speed (commercial flight)
+
+    TimeSinceLoginRequest:
+      type: object
+      required: [kind, loginTimestamp]
+      properties:
+        kind: { type: string, enum: [time_since_login] }
+        loginTimestamp:
+          type: string
+          format: date-time
+        minMs:
+          type: integer
+          default: 5000
+          description: Too fast after login = automation
+        maxMs:
+          type: integer
+          default: 3600000
+          description: Too long after login = stale session
+
+    TLSFingerprintRequest:
+      type: object
+      required: [kind, ja3Hash, claimedUserAgent]
+      properties:
+        kind: { type: string, enum: [tls_fingerprint] }
+        ja3Hash:
+          type: string
+          description: JA3 (or JA4) TLS fingerprint hash, computed at the bank's edge proxy
+        claimedUserAgent:
+          type: string
+          description: UA header claimed by the client
+
+    RequestIdempotencyBreachRequest:
+      type: object
+      required: [kind, paymentHash]
+      properties:
+        kind: { type: string, enum: [request_idempotency_breach] }
+        paymentHash:
+          type: string
+          description: SHA-256 of canonical payment payload (recipient + amount + currency + timestamp-bucket)
+        lookbackMinutes:
+          type: integer
+          default: 10
+
+    RecentPasswordChangeRequest:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [recent_password_change] }
+        lookbackHours:
+          type: integer
+          default: 72
+          minimum: 1
+
+    RecentContactChangeRequest:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [recent_contact_change] }
+        lookbackHours:
+          type: integer
+          default: 72
+        channels:
+          type: array
+          items:
+            type: string
+            enum: [phone, email, address]
+          default: [phone, email]
+
+    DeviceIdPerUserRatioRequest:
+      type: object
+      required: [kind, deviceFingerprintHash]
+      properties:
+        kind: { type: string, enum: [device_id_per_user_ratio] }
+        deviceFingerprintHash: { type: string }
+        maxAccounts:
+          type: integer
+          default: 3
+          minimum: 1
+          description: Trigger if same fingerprint associated with > maxAccounts user IDs
+
+    SharedRecipientGraphRequest:
+      type: object
+      required: [kind, recipientHash]
+      properties:
+        kind: { type: string, enum: [shared_recipient_graph] }
+        recipientHash: { type: string }
+        lookbackHours:
+          type: integer
+          default: 24
+        minOtherSenders:
+          type: integer
+          default: 5
+          description: Trigger if ≥ minOtherSenders other unique users sent to this recipient recently
+
+    IncomingCallCorrelationRequest:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [incoming_call_correlation] }
+        windowMs:
+          type: integer
+          default: 600000
+          description: |
+            Look for incoming calls within this window before transaction.
+            **Mobile-only.** Web clients should not request this factor; server returns
+            status=insufficient_data.
+        unknownNumbersOnly:
+          type: boolean
+          default: true
+
+    # ============================================================
+    # Recall question challenge
+    # ============================================================
+
+    RecallQuestionRequest:
+      type: object
+      required: [userId]
+      properties:
+        userId: { type: string }
+        lookbackDays:
+          type: integer
+          default: 30
+          minimum: 7
+          maximum: 90
+        excludeRecipientHashes:
+          type: array
+          items: { type: string }
+          description: |
+            Exclude these recipients from challenge generation (e.g., the recipient
+            of the current suspicious transaction — to prevent the scammer-fed value
+            being one of the options).
+        locale:
+          type: string
+          default: ru-RU
+          description: Question text locale
+
+    RecallQuestionResponse:
+      oneOf:
+        - $ref: '#/components/schemas/RecallQuestionOk'
+        - $ref: '#/components/schemas/RecallQuestionInsufficient'
+
+    RecallQuestionOk:
+      type: object
+      required: [challengeId, kind, question, options, correctIndex, expiresAt]
+      properties:
+        challengeId: { type: string }
+        kind: { type: string, enum: [recall_question] }
+        question: { type: string }
+        options:
+          type: array
+          minItems: 3
+          maxItems: 5
+          items: { type: string }
+        correctIndex:
+          type: integer
+          minimum: 0
+        expiresAt:
+          type: string
+          format: date-time
+
+    RecallQuestionInsufficient:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [insufficient_history]
+        fallbackChallenge:
+          type: string
+          enum: [face_count_check, face_liveness, manual_review]
+
+    # ============================================================
+    # Decision reporting
+    # ============================================================
+
+    DecisionReport:
+      type: object
+      required: [transactionId, userId, decision]
+      properties:
+        transactionId: { type: string, format: uuid }
+        userId: { type: string }
+        decision:
+          type: object
+          required: [level, score, reasons, timestamp]
+          properties:
+            level: { $ref: '#/components/schemas/DecisionLevel' }
+            score:
+              type: integer
+              minimum: 0
+              maximum: 100
+            reasons:
+              type: array
+              items:
+                type: object
+                required: [code, contribution]
+                properties:
+                  code: { $ref: '#/components/schemas/ReasonCode' }
+                  contribution: { type: number, minimum: 0 }
+            challengeResults:
+              type: array
+              items:
+                type: object
+                required: [kind, result]
+                properties:
+                  kind:
+                    type: string
+                    enum: [recall_question, face_count_check, face_liveness_blink, face_liveness_movement, read_aloud, on_call_question]
+                  result:
+                    type: string
+                    enum: [pass, fail, skipped, timeout, denied]
+                  detail: { type: string }
+            timestamp:
+              type: string
+              format: date-time
+            sdkVersion:
+              type: string
+              description: Reporting SDK version for compatibility tracking
+
+    # ============================================================
+    # Health
+    # ============================================================
+
+    HealthStatus:
+      type: object
+      required: [status, factors, version]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, down]
+        factors:
+          type: object
+          description: Per-factor availability status
+          additionalProperties:
+            type: string
+            enum: [ok, degraded, down]
+        version:
+          type: string
+          description: Backend version
+
+# ============================================================
+# Tags grouped at the bottom for reference
+# ============================================================

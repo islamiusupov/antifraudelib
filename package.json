@@ -1,0 +1,17 @@
+{
+  "name": "antifraud",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "scenarios:validate": "npm run build && node scripts/validate-scenarios.cjs"
+  },
+  "dependencies": {
+    "d-bank": "^0.1.9"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.3"
+  },
+  "private": true
+}
