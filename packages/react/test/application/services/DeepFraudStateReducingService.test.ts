@@ -266,4 +266,78 @@ describe('DeepFraudStateReducingService', () => {
     expect(transactionState.assessment.score).toBe(60);
     expect(transactionState.assessment.decision.level).toBe('step_up');
   });
+
+  it('blocks COMP-17 copy-paste with new recipient and amount above history P95', () => {
+    const service = new DeepFraudStateReducingService();
+
+    const state = service.createInitialState({
+      userId: 'user-1',
+      consent: 'behavioral',
+      factors: [
+        factor('copy_paste_recipient', 40, 40, ['copy_paste_recipient']),
+        factor('new_recipient', 25, 25, ['new_recipient_in_flow']),
+        factor('amount_anomaly', 30, 30, ['amount_above_p95']),
+      ],
+    });
+
+    expect(state.assessment.score).toBe(95);
+    expect(state.assessment.decision.level).toBe('block');
+  });
+
+  it('blocks COMP-18 copy-paste with concurrent media using a composite boost', () => {
+    const service = new DeepFraudStateReducingService();
+
+    const state = service.createInitialState({
+      userId: 'user-1',
+      consent: 'behavioral',
+      factors: [
+        factor('copy_paste_recipient', 40, 40, ['copy_paste_recipient']),
+        factor('concurrent_media', 35, 35, ['concurrent_media_active']),
+      ],
+    });
+
+    expect(state.factors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'composite_risk_boost',
+          contribution: 10,
+          reasonCodes: ['copy_paste_concurrent_media_composite'],
+        }),
+      ]),
+    );
+    expect(state.assessment.score).toBe(85);
+    expect(state.assessment.decision.level).toBe('block');
+  });
+
+  it('blocks COMP-19 copy-paste with phishing text for safe account wording', () => {
+    const service = new DeepFraudStateReducingService();
+
+    const state = service.createInitialState({
+      userId: 'user-1',
+      consent: 'behavioral',
+      factors: [
+        factor('copy_paste_recipient', 40, 40, ['copy_paste_recipient']),
+        factor('phishing_text_dom', 60, 60, ['phishing_text_dom']),
+      ],
+    });
+
+    expect(state.assessment.score).toBe(100);
+    expect(state.assessment.decision.level).toBe('block');
+  });
 });
+
+function factor(
+  kind: string,
+  contribution: number,
+  maxContribution: number,
+  reasonCodes: string[],
+) {
+  return {
+    kind,
+    contribution,
+    maxContribution,
+    status: 'ok' as const,
+    source: 'live' as const,
+    reasonCodes,
+  };
+}

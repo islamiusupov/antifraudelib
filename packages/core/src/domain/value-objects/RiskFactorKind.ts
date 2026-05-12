@@ -35,6 +35,7 @@ export type KnownRiskFactorKind =
   | 'incoming_call_correlation'
   | 'clipboard_otp_pattern'
   | 'programmatic_clipboard_read'
+  | 'composite_risk_boost'
   | 'focus_loss_during_input'
   | 'form_fill_order'
   | 'back_navigation_pattern'
