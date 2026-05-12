@@ -3,6 +3,9 @@ export type { DeepFraudContextValueEntity } from './domain/entities/DeepFraudCon
 export type { DeepFraudRootConfigEntity } from './domain/entities/DeepFraudRootConfigEntity';
 export type { DeepFraudStateEntity } from './domain/entities/DeepFraudStateEntity';
 export { DeepFraudStateReducingService } from './application/services/DeepFraudStateReducingService';
+export { DecisionBadge } from './presentation/components/DecisionBadge';
 export { DeepFraud } from './presentation/components/DeepFraud';
 export { DeepFraudRoot } from './presentation/components/DeepFraudRoot';
+export { ReasonCodeList } from './presentation/components/ReasonCodeList';
+export { RiskMeter } from './presentation/components/RiskMeter';
 export { useDeepFraud } from './presentation/hooks/useDeepFraud';
