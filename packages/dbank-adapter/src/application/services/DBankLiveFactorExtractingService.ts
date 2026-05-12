@@ -45,6 +45,15 @@ export class DBankLiveFactorExtractingService {
         source: 'live',
       });
     }
+    if (this.hasEvent(events, 'form_fill_order_observed')) {
+      signals.push({
+        kind: 'form_fill_order',
+        detected: true,
+        confidence: 1,
+        reasonCodes: ['multi_field_recipient_bulk_fill'],
+        source: 'live',
+      });
+    }
     if (this.hasEvent(events, 'page_hidden') && this.hasEvent(events, 'page_visible')) {
       signals.push({
         kind: 'page_visibility',

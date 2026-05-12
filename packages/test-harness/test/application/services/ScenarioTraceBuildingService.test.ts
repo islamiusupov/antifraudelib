@@ -24,7 +24,7 @@ describe('ScenarioTraceBuildingService', () => {
     expect(uncoveredScenarioIds).toEqual([]);
   });
 
-  it('builds specific D-bank traces for warning dwell and visual challenge scenarios', () => {
+  it('builds specific D-bank traces for warning dwell, visual challenge, and form fill scenarios', () => {
     const service = new ScenarioTraceBuildingService();
     const catalog = new ScenarioCatalogParsingService().parse(
       readFileSync(join(process.cwd(), 'prd', 'Scenarios_Catalog_v0.3.md'), 'utf8'),
@@ -40,6 +40,18 @@ describe('ScenarioTraceBuildingService', () => {
     expect(service.build(catalog.scenarios.find((scenario) => scenario.id === 'VIS-02') ?? catalog.scenarios[0]).map((action) => action.kind)).toEqual([
       'bank_opened',
       'visual_challenge_started',
+    ]);
+    expect(
+      service.build({
+        ...catalog.scenarios[0],
+        id: 'FFO-01',
+        factor: 'form_fill_order',
+      }).map((action) => action.kind),
+    ).toEqual([
+      'bank_opened',
+      'transfer_opened',
+      'form_fill_order_observed',
+      'transfer_submitted',
     ]);
   });
 

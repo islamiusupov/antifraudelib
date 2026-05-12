@@ -24,6 +24,7 @@ export class ScenarioTraceBuildingService {
       warning_dwell: [this.action('warning_shown', 300), this.action('warning_confirmed', 700)],
       page_visibility: [this.action('page_hidden', 300), this.action('page_visible', 800)],
       visual_challenge: [this.action('visual_challenge_started', 300)],
+      form_fill_order: [this.action('form_fill_order_observed', 300)],
       keystroke_dynamics: [this.action('keystroke_anomaly_observed', 300)],
       pointer_pattern: [this.action('pointer_anomaly_observed', 300)],
       native_tampering: [this.action('native_tampering_observed', 300)],

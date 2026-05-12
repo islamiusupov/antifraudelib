@@ -11,6 +11,7 @@ const DBANK_OBSERVED_EVENT_KINDS: DBankObservedEventKind[] = [
   'media_active',
   'warning_shown',
   'warning_confirmed',
+  'form_fill_order_observed',
   'page_hidden',
   'page_visible',
   'visual_challenge_started',

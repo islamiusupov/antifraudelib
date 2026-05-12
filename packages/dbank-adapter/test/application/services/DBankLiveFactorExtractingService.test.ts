@@ -62,6 +62,20 @@ describe('DBankLiveFactorExtractingService', () => {
     ]);
   });
 
+  it('extracts multi-field recipient bulk fill as form fill order risk', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(service.extract([event('form_fill_order_observed', 100)])).toEqual([
+      {
+        kind: 'form_fill_order',
+        detected: true,
+        confidence: 1,
+        reasonCodes: ['multi_field_recipient_bulk_fill'],
+        source: 'live',
+      },
+    ]);
+  });
+
   it('extracts page visibility oscillation from hidden-visible trace', () => {
     const service = new DBankLiveFactorExtractingService();
 

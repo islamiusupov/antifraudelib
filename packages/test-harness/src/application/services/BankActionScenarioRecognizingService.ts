@@ -42,6 +42,9 @@ export class BankActionScenarioRecognizingService {
     if (this.hasFastWarningConfirmation(actions)) {
       recognitions.push(this.createRecognition('warning_dwell', 0.9, ['warning_dwell_too_short'], catalog));
     }
+    if (this.hasAction(actions, 'form_fill_order_observed')) {
+      recognitions.push(this.createRecognition('form_fill_order', 1, ['multi_field_recipient_bulk_fill'], catalog));
+    }
     if (this.hasAction(actions, 'page_hidden') && this.hasAction(actions, 'page_visible')) {
       recognitions.push(this.createRecognition('page_visibility', 0.8, ['page_visibility_oscillation'], catalog));
     }

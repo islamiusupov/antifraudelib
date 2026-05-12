@@ -7,6 +7,7 @@ export type BankActionKind =
   | 'transfer_submitted'
   | 'warning_shown'
   | 'warning_confirmed'
+  | 'form_fill_order_observed'
   | 'media_active'
   | 'page_hidden'
   | 'page_visible'

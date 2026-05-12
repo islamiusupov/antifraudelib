@@ -10,6 +10,7 @@ describe('DBankEventRiskFactorsBuildingService', () => {
       service.build([
         event('recipient_pasted', 100),
         event('amount_pasted', 150),
+        event('form_fill_order_observed', 175),
         event('recipient_created', 200),
         event('server_factor_observed', 300, { factor: 'amount_anomaly' }),
       ]),
@@ -42,6 +43,15 @@ describe('DBankEventRiskFactorsBuildingService', () => {
         metadata: {
           rawEventKind: 'recipient_created',
         },
+      },
+      {
+        kind: 'form_fill_order',
+        status: 'ok',
+        contribution: 20,
+        maxContribution: 20,
+        reasonCodes: ['multi_field_recipient_bulk_fill'],
+        source: 'live',
+        metadata: undefined,
       },
       {
         kind: 'amount_anomaly',

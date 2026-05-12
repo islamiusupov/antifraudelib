@@ -277,6 +277,89 @@ describe('LiveInteractionCollectingService', () => {
     expect(events.map((event) => event.kind)).toEqual(['recipient_pasted']);
   });
 
+  it('captures long recipient details filled into several fields in sequence', () => {
+    const documentTarget = new FakeDocumentTarget();
+    const events: LiveInteractionEventEntity[] = [];
+    const ibanTarget = { name: 'recipientIban', value: 'DE89370400440532013000' };
+    const bicTarget = { name: 'recipientBic', value: 'DEUTDEFF500' };
+    const nameTarget = { name: 'recipientName', value: 'Security Service LLC' };
+    let now = 1000;
+
+    new LiveInteractionCollectingService().install({
+      target: { document: documentTarget },
+      now: () => now,
+      onEvent: (event) => events.push(event),
+    });
+
+    [ibanTarget, bicTarget, nameTarget].forEach((target) => {
+      documentTarget.dispatch('input', { target });
+      now += 300;
+    });
+
+    expect(events.map((event) => event.kind)).toEqual([
+      'recipient_pasted',
+      'recipient_pasted',
+      'recipient_pasted',
+      'form_fill_order_observed',
+    ]);
+    expect(events[3]).toMatchObject({
+      kind: 'form_fill_order_observed',
+      metadata: {
+        reason: 'multi_field_recipient_bulk_fill',
+        fieldCount: 3,
+        windowMs: 5000,
+      },
+    });
+  });
+
+  it('does not flag multi-field recipient order for two filled fields only', () => {
+    const documentTarget = new FakeDocumentTarget();
+    const events: LiveInteractionEventEntity[] = [];
+
+    new LiveInteractionCollectingService().install({
+      target: { document: documentTarget },
+      now: () => 1300,
+      onEvent: (event) => events.push(event),
+    });
+
+    documentTarget.dispatch('input', {
+      target: { name: 'recipientIban', value: 'DE89370400440532013000' },
+    });
+    documentTarget.dispatch('input', {
+      target: { name: 'recipientBic', value: 'DEUTDEFF500' },
+    });
+
+    expect(events.map((event) => event.kind)).toEqual(['recipient_pasted', 'recipient_pasted']);
+  });
+
+  it('does not flag several recipient fields typed manually digit by digit', () => {
+    const documentTarget = new FakeDocumentTarget();
+    const events: LiveInteractionEventEntity[] = [];
+    const fields = [
+      { name: 'recipientIban', value: '', nextValue: '408178100000' },
+      { name: 'recipientBic', value: '', nextValue: '044525225' },
+      { name: 'recipientAccount', value: '', nextValue: '407028100000' },
+    ];
+    let now = 2000;
+
+    new LiveInteractionCollectingService().install({
+      target: { document: documentTarget },
+      now: () => now,
+      onEvent: (event) => events.push(event),
+    });
+
+    fields.forEach((field) => {
+      field.nextValue.split('').forEach((digit) => {
+        now += 100;
+        documentTarget.dispatch('keydown', { target: field, key: digit, isTrusted: true });
+        field.value += digit;
+        documentTarget.dispatch('input', { target: field });
+      });
+    });
+
+    expect(events).toEqual([]);
+  });
+
   it('captures suspicious bank chat input text', () => {
     const documentTarget = new FakeDocumentTarget();
     const events: LiveInteractionEventEntity[] = [];

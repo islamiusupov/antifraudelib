@@ -10,14 +10,24 @@ type FieldInputTrackingState = {
   lastRecipientPasteValue?: string;
   lastAmountPasteValue?: string;
 };
+type RecipientBulkFillRecord = {
+  fieldKey: string;
+  atMs: number;
+};
+type RecipientBulkFillTrackingState = {
+  records: RecipientBulkFillRecord[];
+};
 
 const AMOUNT_FIELD_PATTERN = /(amount|sum|total|price|payment|rub|ruble|₽|сумм|руб)/i;
+const RECIPIENT_BULK_FIELD_PATTERN = /(recipient|beneficiary|receiver|iban|bic|bik|swift|account|card|phone|bank|holder|inn|получател|счет|счёт|карта|телефон|бик|банк)/i;
 const RECIPIENT_FIELD_PATTERN = /(recipient|beneficiary|iban|account|card|phone|получател|счет|счёт|карта|телефон)/i;
 const CONFIRM_TEXT_PATTERN = /(confirm|continue|submit|pay|transfer|подтверд|продолж|перевести|отправ)/i;
 const DEFAULT_FAST_KEY_INTERVAL_MS = 60;
 const DEFAULT_RAPID_SCROLL_WINDOW_MS = 700;
 const DEFAULT_RAPID_SCROLL_MINIMUM_EVENTS = 4;
 const DEFAULT_RAPID_SCROLL_DELTA_THRESHOLD = 80;
+const RECIPIENT_BULK_FILL_WINDOW_MS = 5000;
+const RECIPIENT_BULK_FILL_MINIMUM_FIELDS = 3;
 
 export class LiveInteractionCollectingService {
   constructor(
@@ -35,21 +45,22 @@ export class LiveInteractionCollectingService {
     let fastKeyCount = 0;
     let rapidScrollTimes: number[] = [];
     const inputStates = new WeakMap<object, FieldInputTrackingState>();
+    const recipientBulkFillTrackingState: RecipientBulkFillTrackingState = { records: [] };
 
     if (documentTarget !== undefined) {
       const handlePaste = (event: LiveInteractionDomEventEntity) => {
-        const targetText = this.targetText(event.target);
         const targetDescriptor = this.targetDescriptor(event.target);
         const pastedText = event.clipboardData?.getData('text') ?? '';
-        if (RECIPIENT_FIELD_PATTERN.test(targetText) || this.looksLikeRecipient(pastedText)) {
+        if (this.isRecipientTarget(targetDescriptor, pastedText)) {
           this.recordRecipientPaste(inputStates, event.target, pastedText);
+          this.recordRecipientBulkFill(config, recipientBulkFillTrackingState, event.target);
           this.emit(config, 'recipient_pasted', {
             targetText: targetDescriptor,
             pastedLength: pastedText.length,
           });
           return;
         }
-        if (this.isAmountPaste(event.target, targetText, pastedText)) {
+        if (this.isAmountPaste(event.target, targetDescriptor, pastedText)) {
           this.recordAmountPaste(inputStates, event.target, pastedText);
           this.emit(config, 'amount_pasted', {
             targetText: targetDescriptor,
@@ -113,7 +124,7 @@ export class LiveInteractionCollectingService {
         }
       };
       const handleInput = (event: LiveInteractionDomEventEntity) => {
-        this.detectRecipientFilledWithoutTyping(config, inputStates, event.target);
+        this.detectRecipientFilledWithoutTyping(config, inputStates, recipientBulkFillTrackingState, event.target);
         this.detectAmountFilledWithoutTyping(config, inputStates, event.target);
         this.scanText(config, this.targetText(event.target), 'input');
       };
@@ -277,12 +288,13 @@ export class LiveInteractionCollectingService {
   private detectRecipientFilledWithoutTyping(
     config: LiveInteractionCollectingConfigEntity,
     inputStates: WeakMap<object, FieldInputTrackingState>,
+    recipientBulkFillTrackingState: RecipientBulkFillTrackingState,
     target: unknown,
   ): void {
     const state = this.fieldState(inputStates, target);
     if (state === undefined) return;
 
-    const targetText = this.targetText(target);
+    const targetText = this.targetDescriptor(target);
     const targetValue = this.targetValue(target);
     if (!this.isRecipientTarget(targetText, targetValue)) return;
 
@@ -300,6 +312,7 @@ export class LiveInteractionCollectingService {
       pastedLength: targetValue.length,
       reason: wasFilledWithoutTyping ? 'filled_without_typing' : 'bulk_input_jump',
     });
+    this.recordRecipientBulkFill(config, recipientBulkFillTrackingState, target);
     state.lastRecipientPasteValue = targetValue;
   }
 
@@ -333,7 +346,34 @@ export class LiveInteractionCollectingService {
   }
 
   private isRecipientTarget(targetText: string, targetValue: string): boolean {
-    return RECIPIENT_FIELD_PATTERN.test(targetText) || this.looksLikeRecipient(targetValue);
+    return RECIPIENT_FIELD_PATTERN.test(targetText)
+      || RECIPIENT_BULK_FIELD_PATTERN.test(targetText)
+      || this.looksLikeRecipient(targetValue);
+  }
+
+  private recordRecipientBulkFill(
+    config: LiveInteractionCollectingConfigEntity,
+    recipientBulkFillTrackingState: RecipientBulkFillTrackingState,
+    target: unknown,
+  ): void {
+    const fieldKey = this.targetDescriptor(target);
+    if (fieldKey === '') return;
+
+    const atMs = this.now(config);
+    const records = recipientBulkFillTrackingState.records
+      .filter((record) => atMs - record.atMs <= RECIPIENT_BULK_FILL_WINDOW_MS)
+      .filter((record) => record.fieldKey !== fieldKey);
+
+    records.push({ fieldKey, atMs });
+    recipientBulkFillTrackingState.records = records;
+
+    if (records.length < RECIPIENT_BULK_FILL_MINIMUM_FIELDS) return;
+    this.emit(config, 'form_fill_order_observed', {
+      reason: 'multi_field_recipient_bulk_fill',
+      fieldCount: records.length,
+      windowMs: RECIPIENT_BULK_FILL_WINDOW_MS,
+    });
+    recipientBulkFillTrackingState.records = [];
   }
 
   private isAmountTarget(target: unknown, targetDescriptor: string, targetValue: string): boolean {
