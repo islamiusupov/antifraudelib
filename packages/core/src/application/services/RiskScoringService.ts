@@ -1,29 +1,27 @@
 import type { FactorContributionEntity } from '../../domain/entities/FactorContributionEntity';
+import { DEFAULT_AGGREGATION_LIMIT } from '../../domain/constants/RiskScoringAggregation';
 import type { RiskAssessmentEntity } from '../../domain/entities/RiskAssessmentEntity';
-import type { RiskDecisionLevel } from '../../domain/value-objects/RiskDecisionLevel';
 import type { RiskFactorEntity } from '../../domain/entities/RiskFactorEntity';
 import type { RiskFactorStatus } from '../../domain/value-objects/RiskFactorStatus';
 import type { RiskReasonEntity } from '../../domain/entities/RiskReasonEntity';
 import type { RiskScoringRequestEntity } from '../../domain/entities/RiskScoringRequestEntity';
+import { RiskThresholdResolvingService } from './RiskThresholdResolvingService';
 
 export class RiskScoringService {
+  private readonly riskThresholdResolvingService = new RiskThresholdResolvingService();
+
   score(request: RiskScoringRequestEntity): RiskAssessmentEntity {
     const maxScore = this.normalizeMaxScore(request.maxScore);
+    const aggregationLimit = this.normalizeAggregationLimit(request.aggregationLimit);
     const factorContributions = request.factors.map((factor) => this.normalizeFactorContribution(factor));
-    const score = Math.round(
-      this.clamp(
-        factorContributions.reduce((total, factor) => total + factor.contribution, 0),
-        0,
-        maxScore,
-      ),
-    );
+    const score = this.calculateScore(factorContributions, maxScore, aggregationLimit);
     const reasons = this.buildReasons(factorContributions);
 
     return {
       scope: request.scope,
       score,
       decision: {
-        level: this.resolveDecisionLevel(score),
+        level: this.riskThresholdResolvingService.resolve(score, request.thresholds),
         score,
         reasons,
       },
@@ -34,6 +32,11 @@ export class RiskScoringService {
   private normalizeMaxScore(maxScore?: number): number {
     if (maxScore === undefined) return 100;
     return this.clamp(maxScore, 1, 100);
+  }
+
+  private normalizeAggregationLimit(aggregationLimit?: number): number {
+    if (aggregationLimit === undefined) return DEFAULT_AGGREGATION_LIMIT;
+    return Math.max(Math.floor(this.normalizeNumber(aggregationLimit)), 1);
   }
 
   private normalizeFactorContribution(factor: RiskFactorEntity): FactorContributionEntity {
@@ -52,6 +55,18 @@ export class RiskScoringService {
       reasonCodes: factor.reasonCodes ?? [],
       metadata: factor.metadata,
     };
+  }
+
+  private calculateScore(
+    factorContributions: FactorContributionEntity[],
+    maxScore: number,
+    aggregationLimit: number,
+  ): number {
+    const selectedContributions = [...factorContributions]
+      .sort((left, right) => right.contribution - left.contribution)
+      .slice(0, aggregationLimit);
+    const total = selectedContributions.reduce((sum, factor) => sum + factor.contribution, 0);
+    return Math.round(this.clamp(total, 0, maxScore));
   }
 
   private normalizeMaxContribution(maxContribution: number | undefined, fallback: number): number {
@@ -91,13 +106,6 @@ export class RiskScoringService {
       factorKind: reason.factorKind,
       contribution: reason.contribution,
     }));
-  }
-
-  private resolveDecisionLevel(score: number): RiskDecisionLevel {
-    if (score >= 85) return 'block';
-    if (score >= 60) return 'step_up';
-    if (score >= 30) return 'monitor';
-    return 'allow';
   }
 
   private normalizeNumber(value: number): number {

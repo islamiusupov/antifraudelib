@@ -104,6 +104,45 @@ describe('RiskScoringService', () => {
       'warning_skipped',
     ]);
   });
+
+  it('uses top seven factor contributions for PRD aggregation', () => {
+    const service = new RiskScoringService();
+
+    const result = service.score({
+      scope: 'transaction',
+      factors: [
+        factor('copy_paste_recipient', 40, 40, ['copy_paste_recipient']),
+        factor('concurrent_media', 35, 35, ['concurrent_media_active']),
+        factor('keystroke_dynamics', 30, 30, ['keystroke_anomaly']),
+        factor('page_visibility', 25, 25, ['page_visibility_oscillation']),
+        factor('warning_dwell', 20, 20, ['warning_skipped']),
+        factor('focus_loss_during_input', 20, 20, ['focus_loss_during_input']),
+        factor('dev_environment', 15, 15, ['devtools_open']),
+        factor('screen_orientation_change', 10, 10, ['screen_orientation_change']),
+      ],
+    });
+
+    expect(result.score).toBe(100);
+    expect(result.factorContributions).toHaveLength(8);
+    expect(result.decision.reasons).toHaveLength(8);
+  });
+
+  it('supports custom decision thresholds from a scoring request', () => {
+    const service = new RiskScoringService();
+
+    const result = service.score({
+      scope: 'transaction',
+      thresholds: {
+        monitor: 20,
+        stepUp: 45,
+        block: 70,
+      },
+      factors: [factor('concurrent_media', 35, 35, ['concurrent_media_active'])],
+    });
+
+    expect(result.score).toBe(35);
+    expect(result.decision.level).toBe('monitor');
+  });
 });
 
 function factor(

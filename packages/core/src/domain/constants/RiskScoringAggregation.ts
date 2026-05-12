@@ -1,0 +1,1 @@
+export const DEFAULT_AGGREGATION_LIMIT = 7;
