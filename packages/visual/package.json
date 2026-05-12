@@ -1,0 +1,11 @@
+{
+  "name": "@deepcode/antifraud-visual",
+  "version": "0.0.0",
+  "description": "Visual challenge adapters for DeepCode Antifraud.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "private": true
+}

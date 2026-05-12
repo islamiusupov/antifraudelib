@@ -2,7 +2,7 @@
 /out-tsc
 
 /node_modules
-/dist
+dist/
 /.npm-cache
 .env
 .env.*

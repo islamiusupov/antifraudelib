@@ -1,0 +1,11 @@
+{
+  "name": "@deepcode/antifraud-core",
+  "version": "0.0.0",
+  "description": "Framework-agnostic antifraud domain and application core.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "private": true
+}

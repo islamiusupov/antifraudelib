@@ -1,0 +1,17 @@
+{
+  "name": "@deepcode/antifraud-demo",
+  "version": "0.0.0",
+  "description": "D-bank workbench demo for DeepCode Antifraud.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@deepcode/antifraud-dbank-adapter": "0.0.0",
+    "@deepcode/antifraud-react": "0.0.0",
+    "@deepcode/antifraud-test-harness": "0.0.0",
+    "d-bank": "^0.1.9"
+  },
+  "private": true
+}

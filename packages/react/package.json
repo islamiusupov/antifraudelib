@@ -1,0 +1,17 @@
+{
+  "name": "@deepcode/antifraud-react",
+  "version": "0.0.0",
+  "description": "Reusable React bindings and UI components for DeepCode Antifraud.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@deepcode/antifraud-core": "0.0.0"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "private": true
+}

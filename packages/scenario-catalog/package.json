@@ -1,0 +1,11 @@
+{
+  "name": "@deepcode/antifraud-scenario-catalog",
+  "version": "0.0.0",
+  "description": "PRD scenario catalog parsing and validation package.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "private": true
+}

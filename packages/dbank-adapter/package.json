@@ -1,0 +1,11 @@
+{
+  "name": "@deepcode/antifraud-dbank-adapter",
+  "version": "0.0.0",
+  "description": "D-bank adapter used only by the demo and bank scenario harness.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "private": true
+}

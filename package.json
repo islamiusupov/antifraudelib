@@ -3,13 +3,16 @@
   "version": "1.0.0",
   "description": "",
   "main": "dist/index.js",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
-    "build": "tsc",
-    "scenarios:validate": "npm run build && node scripts/validate-scenarios.cjs"
+    "build": "npm run build:root && npm run build --workspaces --if-present",
+    "build:root": "tsc -p tsconfig.json",
+    "scenarios:validate": "npm run build:root && node scripts/validate-scenarios.cjs"
   },
-  "dependencies": {
-    "d-bank": "^0.1.9"
-  },
+  "dependencies": {},
   "devDependencies": {
     "typescript": "^5.5.3"
   },

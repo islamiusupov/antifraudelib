@@ -1,0 +1,11 @@
+{
+  "name": "@deepcode/antifraud-mock-antifraud-api",
+  "version": "0.0.0",
+  "description": "Mock antifraud helper API following the PRD OpenAPI contract.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "private": true
+}

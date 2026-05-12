@@ -1,0 +1,11 @@
+{
+  "name": "@deepcode/antifraud-mock-bank-api",
+  "version": "0.0.0",
+  "description": "Mock D-bank API for local scenario execution.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "private": true
+}
