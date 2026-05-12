@@ -13,6 +13,7 @@ describe('DBankWorkbench', () => {
     expect(markup).toContain('data-dbank-event-count="0"');
     expect(markup).toContain('data-decision="step_up"');
     expect(markup).toContain('deepfraud-visual-challenge-gate');
+    expect(markup).toContain('deepfraud-risk-factor-list');
     expect(markup).toContain('copy_paste_recipient');
     expect(markup).toContain('new_recipient_in_cooldown');
   });
