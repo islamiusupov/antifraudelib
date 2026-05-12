@@ -25,11 +25,13 @@ describe('DBankEventRiskFactorsBuildingService', () => {
       {
         kind: 'new_recipient',
         status: 'ok',
-        contribution: 25,
+        contribution: 10,
         maxContribution: 25,
-        reasonCodes: ['new_recipient_in_flow'],
+        reasonCodes: ['new_recipient_ui_only'],
         source: 'server',
-        metadata: undefined,
+        metadata: {
+          rawEventKind: 'recipient_created',
+        },
       },
       {
         kind: 'amount_anomaly',

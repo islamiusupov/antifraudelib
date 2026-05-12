@@ -14,14 +14,9 @@ export class DBankLiveFactorExtractingService {
         source: 'live',
       });
     }
-    if (this.hasEvent(events, 'recipient_created')) {
-      signals.push({
-        kind: 'new_recipient',
-        detected: true,
-        confidence: 1,
-        reasonCodes: ['new_recipient_in_flow'],
-        source: 'server',
-      });
+    const recipientCreatedEvent = events.find((event) => event.kind === 'recipient_created');
+    if (recipientCreatedEvent !== undefined) {
+      signals.push(this.newRecipientSignal(recipientCreatedEvent));
     }
     if (this.hasEvent(events, 'media_active')) {
       signals.push({
@@ -177,6 +172,34 @@ export class DBankLiveFactorExtractingService {
 
   private hasEvent(events: DBankObservedEventEntity[], kind: DBankObservedEventEntity['kind']): boolean {
     return events.some((event) => event.kind === kind);
+  }
+
+  private newRecipientSignal(event: DBankObservedEventEntity): RiskSignalEntity {
+    if (this.isServerVerifiedNewRecipient(event.metadata)) {
+      return {
+        kind: 'new_recipient',
+        detected: true,
+        confidence: 1,
+        reasonCodes: ['new_recipient_in_flow'],
+        source: 'server',
+        metadata: event.metadata,
+      };
+    }
+
+    return {
+      kind: 'new_recipient',
+      detected: true,
+      confidence: 0.4,
+      reasonCodes: ['new_recipient_ui_only'],
+      source: 'server',
+      metadata: {
+        rawEventKind: event.kind,
+      },
+    };
+  }
+
+  private isServerVerifiedNewRecipient(metadata: DBankObservedEventEntity['metadata']): boolean {
+    return metadata?.serverVerified === true;
   }
 
   private hasFastWarningConfirmation(events: DBankObservedEventEntity[]): boolean {

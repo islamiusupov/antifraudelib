@@ -113,6 +113,63 @@ describe('DeepFraudStateReducingService', () => {
     expect(challengeState.assessment.decision.level).toBe('block');
   });
 
+  it('deduplicates the same risk factor across scopes and keeps unique reasons', () => {
+    const service = new DeepFraudStateReducingService();
+    const initialState = service.createInitialState({
+      userId: 'user-1',
+      consent: 'behavioral',
+      factors: [],
+    });
+    const sessionState = service.replaceScopeFactors(initialState, 'session', [
+      {
+        kind: 'page_visibility',
+        contribution: 20,
+        maxContribution: 25,
+        status: 'ok',
+        reasonCodes: ['page_visibility_oscillation'],
+      },
+    ]);
+
+    const transactionState = service.replaceScopeFactors(sessionState, 'transaction', [
+      {
+        kind: 'page_visibility',
+        contribution: 20,
+        maxContribution: 25,
+        status: 'ok',
+        reasonCodes: ['page_visibility_oscillation'],
+      },
+      {
+        kind: 'concurrent_media',
+        contribution: 35,
+        maxContribution: 35,
+        status: 'ok',
+        reasonCodes: ['layer2_media_request'],
+      },
+    ]);
+
+    expect(transactionState.factors).toEqual([
+      {
+        kind: 'page_visibility',
+        contribution: 20,
+        maxContribution: 25,
+        status: 'ok',
+        reasonCodes: ['page_visibility_oscillation'],
+      },
+      {
+        kind: 'concurrent_media',
+        contribution: 35,
+        maxContribution: 35,
+        status: 'ok',
+        reasonCodes: ['layer2_media_request'],
+      },
+    ]);
+    expect(transactionState.assessment.score).toBe(55);
+    expect(transactionState.assessment.decision.reasons.map((reason) => reason.code)).toEqual([
+      'layer2_media_request',
+      'page_visibility_oscillation',
+    ]);
+  });
+
   it('clears a scope when it is replaced with an empty factor list', () => {
     const service = new DeepFraudStateReducingService();
     const initialState = service.createInitialState({

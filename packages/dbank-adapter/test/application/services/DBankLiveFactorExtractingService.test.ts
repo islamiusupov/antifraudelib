@@ -87,6 +87,50 @@ describe('DBankLiveFactorExtractingService', () => {
     ]);
   });
 
+  it('treats raw UI recipient creation as a low-confidence signal', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(service.extract([event('recipient_created', 100)])).toEqual([
+      {
+        kind: 'new_recipient',
+        detected: true,
+        confidence: 0.4,
+        reasonCodes: ['new_recipient_ui_only'],
+        source: 'server',
+        metadata: {
+          rawEventKind: 'recipient_created',
+        },
+      },
+    ]);
+  });
+
+  it('uses full confidence when recipient creation carries server verification metadata', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('recipient_created', 100, {
+          serverVerified: true,
+          recipientAgeHours: 1,
+          txCountToRecipient: 0,
+        }),
+      ]),
+    ).toEqual([
+      {
+        kind: 'new_recipient',
+        detected: true,
+        confidence: 1,
+        reasonCodes: ['new_recipient_in_flow'],
+        source: 'server',
+        metadata: {
+          serverVerified: true,
+          recipientAgeHours: 1,
+          txCountToRecipient: 0,
+        },
+      },
+    ]);
+  });
+
   it('ignores malformed server factor events without a string factor metadata value', () => {
     const service = new DBankLiveFactorExtractingService();
 

@@ -53,6 +53,40 @@ export class DeepFraudStateReducingService {
       const scopeFactors = scopedFactors[scope as RiskScope] ?? [];
       factors.push(...scopeFactors);
     });
-    return factors;
+    return this.deduplicateFactors(factors);
+  }
+
+  private deduplicateFactors(factors: RiskFactorEntity[]): RiskFactorEntity[] {
+    const factorsByKind = new Map<string, RiskFactorEntity>();
+
+    factors.forEach((factor) => {
+      const existingFactor = factorsByKind.get(factor.kind);
+      if (existingFactor === undefined) {
+        factorsByKind.set(factor.kind, factor);
+        return;
+      }
+
+      factorsByKind.set(factor.kind, this.mergeFactor(existingFactor, factor));
+    });
+
+    return Array.from(factorsByKind.values());
+  }
+
+  private mergeFactor(left: RiskFactorEntity, right: RiskFactorEntity): RiskFactorEntity {
+    const selectedFactor = right.contribution > left.contribution ? right : left;
+
+    return {
+      ...selectedFactor,
+      contribution: Math.max(left.contribution, right.contribution),
+      maxContribution: Math.max(left.maxContribution ?? left.contribution, right.maxContribution ?? right.contribution),
+      reasonCodes: this.uniqueReasonCodes(left.reasonCodes, right.reasonCodes),
+    };
+  }
+
+  private uniqueReasonCodes(
+    leftReasonCodes: RiskFactorEntity['reasonCodes'],
+    rightReasonCodes: RiskFactorEntity['reasonCodes'],
+  ): string[] {
+    return Array.from(new Set([...(leftReasonCodes ?? []), ...(rightReasonCodes ?? [])]));
   }
 }
