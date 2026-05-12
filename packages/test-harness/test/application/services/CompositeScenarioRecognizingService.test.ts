@@ -53,6 +53,67 @@ describe('CompositeScenarioRecognizingService', () => {
 
     expect(result.some((recognition) => recognition.id === 'C1')).toBe(false);
   });
+
+  it('does not recognize composites that reference scenarios absent from the catalog', () => {
+    const catalog = parsedCatalog();
+    const brokenCatalog = {
+      ...catalog,
+      composites: [
+        {
+          ...catalog.composites[0],
+          combo: ['CPY-01', 'UNKNOWN-01'],
+        },
+      ],
+    };
+
+    const result = new CompositeScenarioRecognizingService().recognize(
+      [
+        recognition('copy_paste_recipient', ['CPY-01']),
+        recognition('new_recipient', ['UNKNOWN-01']),
+      ],
+      brokenCatalog,
+    );
+
+    expect(result).toEqual([]);
+  });
+
+  it('uses the minimum factor confidence and unique ordered reason codes', () => {
+    const catalog = parsedCatalog();
+    const customCatalog = {
+      ...catalog,
+      composites: [
+        {
+          id: 'C99',
+          title: 'Custom composite',
+          combo: ['CPY-01', 'NRC-01'],
+          expectedVerdict: 'block',
+          normalizedVerdict: 'block' as const,
+        },
+      ],
+    };
+
+    const result = new CompositeScenarioRecognizingService().recognize(
+      [
+        recognition('copy_paste_recipient', ['CPY-01'], 0.7, ['shared_reason', 'copy_paste_recipient']),
+        recognition('new_recipient', ['NRC-01'], 0.4, ['shared_reason', 'new_recipient_in_flow']),
+      ],
+      customCatalog,
+    );
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: 'C99',
+        confidence: 0.4,
+        reasonCodes: [
+          'composite_c99',
+          'shared_reason',
+          'copy_paste_recipient',
+          'new_recipient_in_flow',
+        ],
+        factors: ['copy_paste_recipient', 'new_recipient'],
+      }),
+    ]);
+  });
 });
 
 function parsedCatalog() {
@@ -67,11 +128,16 @@ function findScenario(id: string, catalog: ReturnType<ScenarioCatalogParsingServ
   return scenario;
 }
 
-function recognition(factor: ScenarioRecognitionEntity['factor'], candidateScenarioIds: string[]): ScenarioRecognitionEntity {
+function recognition(
+  factor: ScenarioRecognitionEntity['factor'],
+  candidateScenarioIds: string[],
+  confidence = 1,
+  reasonCodes = [factor],
+): ScenarioRecognitionEntity {
   return {
     factor,
-    confidence: 1,
-    reasonCodes: [factor],
+    confidence,
+    reasonCodes,
     candidateScenarioIds,
     expectedVerdicts: ['block'],
   };

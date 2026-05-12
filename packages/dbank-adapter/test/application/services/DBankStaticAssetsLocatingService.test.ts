@@ -23,4 +23,13 @@ describe('DBankStaticAssetsLocatingService', () => {
       iframePath: '/bank-ui/index.html',
     });
   });
+
+  it('normalizes custom route prefixes with extra leading and trailing slashes', () => {
+    const service = new DBankStaticAssetsLocatingService();
+
+    expect(service.locate('/repo/antifraud', '///nested/bank///')).toMatchObject({
+      routePrefix: '/nested/bank',
+      iframePath: '/nested/bank/index.html',
+    });
+  });
 });

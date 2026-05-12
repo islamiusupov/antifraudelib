@@ -39,9 +39,9 @@ describe('ReasonCodeList', () => {
     expect(
       renderToStaticMarkup(
         <DeepFraudRoot userId="user-1" consent="behavioral">
-          <ReasonCodeList />
+          <ReasonCodeList className="custom-reasons" />
         </DeepFraudRoot>,
       ),
-    ).toContain('No risk reasons');
+    ).toBe('<p class="deepfraud-reason-code-list custom-reasons">No risk reasons</p>');
   });
 });

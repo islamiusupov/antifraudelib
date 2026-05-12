@@ -33,4 +33,20 @@ describe('KeystrokeDynamicsFeatureVectorBuildingService', () => {
       sampleSize: 2,
     });
   });
+
+  it('treats empty interval samples as insufficient for behavioral deviation', () => {
+    const service = new KeystrokeDynamicsFeatureVectorBuildingService();
+
+    expect(
+      service.build({
+        intervalsMs: [],
+        baselineMedianMs: 125,
+      }),
+    ).toEqual({
+      meanRelativeDeviation: 0,
+      maxRelativeDeviation: 0,
+      longPauseRatio: 0,
+      sampleSize: 0,
+    });
+  });
 });

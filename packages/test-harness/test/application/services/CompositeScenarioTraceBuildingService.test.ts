@@ -21,4 +21,21 @@ describe('CompositeScenarioTraceBuildingService', () => {
     expect(catalog.composites).toHaveLength(10);
     expect(uncoveredCompositeIds).toEqual([]);
   });
+
+  it('throws when a composite references a scenario missing from the catalog', () => {
+    const catalog = new ScenarioCatalogParsingService().parse(
+      readFileSync(join(process.cwd(), 'prd', 'Scenarios_Catalog_v0.3.md'), 'utf8'),
+    );
+    const service = new CompositeScenarioTraceBuildingService();
+
+    expect(() =>
+      service.build(
+        {
+          ...catalog.composites[0],
+          combo: ['CPY-01', 'UNKNOWN-01'],
+        },
+        catalog,
+      ),
+    ).toThrow('Missing scenario UNKNOWN-01');
+  });
 });

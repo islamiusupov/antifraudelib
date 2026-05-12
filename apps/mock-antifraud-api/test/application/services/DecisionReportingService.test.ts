@@ -46,5 +46,12 @@ describe('DecisionReportingService', () => {
         decision: { level: 'ok', score: 101, reasons: [], timestamp: '2026-05-11T14:24:12.000Z' },
       }),
     ).toThrow('between 0 and 100');
+    expect(() =>
+      service.report({
+        transactionId: 'tx-1',
+        userId: 'u-demo',
+        decision: { level: 'ok', score: -1, reasons: [], timestamp: '2026-05-11T14:24:12.000Z' },
+      }),
+    ).toThrow('between 0 and 100');
   });
 });

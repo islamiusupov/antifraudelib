@@ -10,6 +10,8 @@ describe('ScenarioVerdictNormalizingService', () => {
     ['continue', 'continue'],
     ['varies; fallback к recall question', 'varies'],
     ['edge: tune model', 'edge'],
+    ['  BLOCK (manual review) ', 'block'],
+    ['allow only after monitor review', 'monitor'],
   ] as const)('normalizes %s to %s', (input, expected) => {
     const service = new ScenarioVerdictNormalizingService();
 

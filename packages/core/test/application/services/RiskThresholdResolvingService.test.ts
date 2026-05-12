@@ -26,4 +26,18 @@ describe('RiskThresholdResolvingService', () => {
       }),
     ).toBe('step_up');
   });
+
+  it('treats override boundaries as inclusive lower bounds', () => {
+    const service = new RiskThresholdResolvingService();
+    const thresholds = {
+      monitor: 10,
+      stepUp: 20,
+      block: 30,
+    };
+
+    expect(service.resolve(9, thresholds)).toBe('allow');
+    expect(service.resolve(10, thresholds)).toBe('monitor');
+    expect(service.resolve(20, thresholds)).toBe('step_up');
+    expect(service.resolve(30, thresholds)).toBe('block');
+  });
 });

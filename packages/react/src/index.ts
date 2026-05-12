@@ -1,9 +1,12 @@
 export type { DeepFraudConsent } from './domain/value-objects/DeepFraudConsent';
 export type { DeepFraudContextValueEntity } from './domain/entities/DeepFraudContextValueEntity';
+export type { DeviceFingerprintCollectionConfigEntity } from './domain/entities/DeviceFingerprintCollectionConfigEntity';
+export type { DeviceFingerprintCollectionEntity } from './domain/entities/DeviceFingerprintCollectionEntity';
 export type { DeepFraudRootConfigEntity } from './domain/entities/DeepFraudRootConfigEntity';
 export type { DeepFraudStateEntity } from './domain/entities/DeepFraudStateEntity';
 export type { VisualChallengeCameraState } from './domain/value-objects/VisualChallengeCameraState';
 export { CameraPermissionRiskFactorBuildingService } from './application/services/CameraPermissionRiskFactorBuildingService';
+export { DeviceFingerprintCollectingService, type DeviceFingerprintCollectingServiceDependencies } from './application/services/DeviceFingerprintCollectingService';
 export { DeepFraudStateReducingService } from './application/services/DeepFraudStateReducingService';
 export { DecisionBadge } from './presentation/components/DecisionBadge';
 export { DeepFraud } from './presentation/components/DeepFraud';

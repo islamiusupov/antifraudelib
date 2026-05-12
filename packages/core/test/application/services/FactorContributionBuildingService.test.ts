@@ -81,4 +81,60 @@ describe('FactorContributionBuildingService', () => {
       metadata: undefined,
     });
   });
+
+  it('clamps confidence outside the 0..1 range', () => {
+    const service = new FactorContributionBuildingService();
+
+    expect(
+      service.build({
+        kind: 'warning_dwell',
+        detected: true,
+        confidence: 2,
+      }).contribution,
+    ).toBe(20);
+
+    expect(
+      service.build({
+        kind: 'warning_dwell',
+        detected: true,
+        confidence: -1,
+      }).contribution,
+    ).toBe(0);
+  });
+
+  it('uses explicit non-ok status as non-scoring even when detected is true', () => {
+    const service = new FactorContributionBuildingService();
+
+    expect(
+      service.build({
+        kind: 'geoip_jump',
+        detected: true,
+        status: 'timeout',
+        contribution: 30,
+        reasonCodes: ['geoip_impossible_travel'],
+      }),
+    ).toMatchObject({
+      kind: 'geoip_jump',
+      status: 'timeout',
+      contribution: 0,
+      maxContribution: 30,
+      reasonCodes: ['geoip_impossible_travel'],
+    });
+  });
+
+  it('normalizes non-finite and negative override values to zero', () => {
+    const service = new FactorContributionBuildingService();
+
+    expect(
+      service.build({
+        kind: 'bank_custom_watchlist',
+        detected: true,
+        contribution: Number.POSITIVE_INFINITY,
+        maxContribution: -10,
+      }),
+    ).toMatchObject({
+      contribution: 0,
+      maxContribution: 0,
+    });
+  });
 });

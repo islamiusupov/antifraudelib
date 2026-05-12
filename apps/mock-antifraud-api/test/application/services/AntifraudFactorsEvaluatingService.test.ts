@@ -56,4 +56,44 @@ describe('AntifraudFactorsEvaluatingService', () => {
       reasonCodes: [],
     });
   });
+
+  it('preserves factor order and returns default max contribution for known factors without a scenario hit', () => {
+    const service = new AntifraudFactorsEvaluatingService();
+
+    const response = service.evaluate({
+      transactionId: 'tx-1',
+      userId: 'u-demo',
+      factors: [
+        { kind: 'unknown' },
+        { kind: 'tls_fingerprint' },
+        { kind: 'device_id_per_user_ratio', deviceFingerprintHash: 'sha256:abc' },
+      ],
+    });
+
+    expect(response.evaluations).toEqual([
+      {
+        kind: 'unknown',
+        status: 'unknown_factor',
+        contribution: 0,
+        maxContribution: 0,
+        reasonCodes: [],
+      },
+      {
+        kind: 'tls_fingerprint',
+        status: 'ok',
+        contribution: 0,
+        maxContribution: 30,
+        reasonCodes: [],
+        metadata: {},
+      },
+      {
+        kind: 'device_id_per_user_ratio',
+        status: 'ok',
+        contribution: 0,
+        maxContribution: 50,
+        reasonCodes: [],
+        metadata: {},
+      },
+    ]);
+  });
 });

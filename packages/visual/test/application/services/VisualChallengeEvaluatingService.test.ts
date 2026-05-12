@@ -74,4 +74,39 @@ describe('VisualChallengeEvaluatingService', () => {
       },
     });
   });
+
+  it('falls back when face count is unavailable after camera permission is granted', () => {
+    const service = new VisualChallengeEvaluatingService();
+
+    expect(
+      service.evaluate({
+        cameraPermission: 'granted',
+      }),
+    ).toEqual({
+      result: 'fallback',
+      reasonCodes: ['face_count_unavailable'],
+      riskSignal: {
+        kind: 'visual_challenge',
+        detected: true,
+        confidence: 0.2,
+        reasonCodes: ['face_count_unavailable'],
+        source: 'live',
+      },
+    });
+  });
+
+  it.each([
+    [{ blinkDetected: false, movementDetected: true }],
+    [{ blinkDetected: true, movementDetected: false }],
+  ])('blocks when one liveness signal is missing: %s', (liveness) => {
+    const service = new VisualChallengeEvaluatingService();
+
+    expect(
+      service.evaluate({
+        cameraPermission: 'granted',
+        faceCount: 1,
+        ...liveness,
+      }).reasonCodes,
+    ).toEqual(['face_liveness_failed']);
+  });
 });

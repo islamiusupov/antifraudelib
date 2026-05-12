@@ -42,6 +42,23 @@ describe('DBankEventRiskFactorsBuildingService', () => {
       },
     ]);
   });
+
+  it('returns no factors for empty event streams', () => {
+    const service = new DBankEventRiskFactorsBuildingService();
+
+    expect(service.build([])).toEqual([]);
+  });
+
+  it('ignores server factor events without a string factor name', () => {
+    const service = new DBankEventRiskFactorsBuildingService();
+
+    expect(
+      service.build([
+        event('server_factor_observed', 100),
+        event('server_factor_observed', 200, { factor: ['amount_anomaly'] }),
+      ]),
+    ).toEqual([]);
+  });
 });
 
 function event(

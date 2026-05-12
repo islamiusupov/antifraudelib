@@ -23,4 +23,15 @@ describe('MarkdownTableRowParsingService', () => {
       'allow',
     ]);
   });
+
+  it('parses rows without border pipes and keeps escaped pipes inside cells', () => {
+    const service = new MarkdownTableRowParsingService();
+
+    expect(service.parse(' 1 | EDGE | text with a\\|b value | monitor ')).toEqual([
+      '1',
+      'EDGE',
+      'text with a|b value',
+      'monitor',
+    ]);
+  });
 });

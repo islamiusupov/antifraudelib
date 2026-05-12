@@ -53,9 +53,17 @@ describe('BankTransferPreparingService', () => {
       service.prepare(state, {
         sourceAccountId: 'acc-1',
         beneficiaryId: 'ben-1',
-        amount: -1,
+        amount: 0,
         currency: 'RUB',
       }),
     ).toThrow('positive');
+    expect(() =>
+      service.prepare(state, {
+        sourceAccountId: 'acc-1',
+        beneficiaryId: 'ben-1',
+        amount: 428056,
+        currency: 'RUB',
+      }),
+    ).toThrow('Insufficient funds');
   });
 });

@@ -143,6 +143,86 @@ describe('RiskScoringService', () => {
     expect(result.score).toBe(35);
     expect(result.decision.level).toBe('monitor');
   });
+
+  it('uses only the requested top aggregation window for score calculation', () => {
+    const service = new RiskScoringService();
+
+    const result = service.score({
+      scope: 'transaction',
+      aggregationLimit: 2,
+      factors: [
+        factor('copy_paste_recipient', 40, 40, ['copy_paste_recipient']),
+        factor('concurrent_media', 35, 35, ['concurrent_media_active']),
+        factor('warning_dwell', 20, 20, ['warning_skipped']),
+      ],
+    });
+
+    expect(result.score).toBe(75);
+    expect(result.decision.level).toBe('step_up');
+    expect(result.decision.reasons.map((reason) => reason.code)).toEqual([
+      'copy_paste_recipient',
+      'concurrent_media_active',
+      'warning_skipped',
+    ]);
+  });
+
+  it('clamps maxScore and aggregationLimit edge values', () => {
+    const service = new RiskScoringService();
+
+    const result = service.score({
+      scope: 'transaction',
+      maxScore: 12,
+      aggregationLimit: 0,
+      factors: [
+        factor('copy_paste_recipient', 40, 40, ['copy_paste_recipient']),
+        factor('concurrent_media', 35, 35, ['concurrent_media_active']),
+      ],
+    });
+
+    expect(result.score).toBe(12);
+    expect(result.decision.level).toBe('allow');
+  });
+
+  it('falls back to factor kind when a scoring factor has no reason codes', () => {
+    const service = new RiskScoringService();
+
+    const result = service.score({
+      scope: 'transaction',
+      factors: [
+        {
+          kind: 'warning_dwell',
+          status: 'ok',
+          contribution: 20,
+          maxContribution: 20,
+        },
+      ],
+    });
+
+    expect(result.decision.reasons).toEqual([
+      {
+        code: 'warning_dwell',
+        factorKind: 'warning_dwell',
+        contribution: 20,
+      },
+    ]);
+  });
+
+  it('normalizes non-finite and negative factor inputs during scoring', () => {
+    const service = new RiskScoringService();
+
+    const result = service.score({
+      scope: 'transaction',
+      factors: [
+        factor('copy_paste_recipient', Number.NaN, 40, ['nan_contribution']),
+        factor('concurrent_media', Number.POSITIVE_INFINITY, 35, ['infinite_contribution']),
+        factor('warning_dwell', 10, -1, ['negative_max']),
+      ],
+    });
+
+    expect(result.score).toBe(0);
+    expect(result.decision.level).toBe('allow');
+    expect(result.decision.reasons).toEqual([]);
+  });
 });
 
 function factor(

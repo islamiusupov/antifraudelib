@@ -67,4 +67,33 @@ describe('ScenarioCatalogValidatingService', () => {
     expect(validation.missingIds).toContain('CPY-01');
     expect(validation.duplicateIds).toEqual([scenarios[0].id]);
   });
+
+  it('reports unknown groups and wrong composite count as invalid', () => {
+    const idBuildingService = new ScenarioIdBuildingService();
+    const service = new ScenarioCatalogValidatingService(idBuildingService);
+    const scenarios = idBuildingService.buildExpectedIds().map((id) => ({
+      id,
+      factor: 'factor',
+      prefix: id === 'CPY-01' ? 'BAD' : id.slice(0, 3),
+      number: Number(id.slice(4)),
+      type: 'TP' as const,
+      scenario: 'Scenario',
+      verdict: 'step_up',
+      normalizedVerdict: 'step_up' as const,
+      kind: 'factor' as const,
+      tier: 'LIVE' as const,
+    }));
+    const catalog: ParsedScenarioCatalogEntity = {
+      groups: [],
+      composites: [],
+      scenarios,
+    };
+
+    expect(service.validate(catalog)).toMatchObject({
+      valid: false,
+      actualScenarioCount: 340,
+      actualCompositeCount: 0,
+      unknownGroups: ['BAD'],
+    });
+  });
 });

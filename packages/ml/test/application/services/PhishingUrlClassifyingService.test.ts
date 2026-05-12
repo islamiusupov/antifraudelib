@@ -39,4 +39,21 @@ describe('PhishingUrlClassifyingService', () => {
       },
     });
   });
+
+  it('keeps suspicious text inactive when it belongs to an allowlisted bank domain', () => {
+    const service = new PhishingUrlClassifyingService();
+
+    expect(
+      service.classify({
+        url: 'https://secure-account.bank.example/login',
+        allowedDomains: ['bank.example'],
+      }),
+    ).toEqual({
+      kind: 'phishing_url',
+      detected: false,
+      confidence: 0,
+      reasonCodes: [],
+      source: 'live',
+    });
+  });
 });

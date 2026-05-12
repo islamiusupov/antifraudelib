@@ -20,6 +20,7 @@ describe('DemoWorkbenchConfigBuildingService', () => {
     const service = new DemoWorkbenchConfigBuildingService();
 
     const config = service.build('/repo/antifraud', {
+      userId: 'custom-user',
       initialFactors: [
         {
           kind: 'copy_paste_recipient',
@@ -31,6 +32,7 @@ describe('DemoWorkbenchConfigBuildingService', () => {
       ],
     });
 
+    expect(config.userId).toBe('custom-user');
     expect(config.initialFactors).toHaveLength(1);
     expect(config.initialFactors[0]?.kind).toBe('copy_paste_recipient');
   });

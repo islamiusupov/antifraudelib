@@ -53,4 +53,35 @@ describe('ServerFactorEvaluationAdaptingService', () => {
       },
     ]);
   });
+
+  it('preserves metadata and empty reason-code arrays from server helpers', () => {
+    const service = new ServerFactorEvaluationAdaptingService();
+
+    expect(
+      service.adapt([
+        {
+          kind: 'device_fingerprint',
+          status: 'ok',
+          contribution: 10,
+          maxContribution: 30,
+          reasonCodes: [],
+          metadata: {
+            deviceAgeDays: 0,
+          },
+        },
+      ]),
+    ).toEqual([
+      {
+        kind: 'device_fingerprint',
+        status: 'ok',
+        contribution: 10,
+        maxContribution: 30,
+        reasonCodes: [],
+        source: 'server',
+        metadata: {
+          deviceAgeDays: 0,
+        },
+      },
+    ]);
+  });
 });

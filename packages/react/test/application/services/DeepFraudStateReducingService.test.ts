@@ -68,4 +68,73 @@ describe('DeepFraudStateReducingService', () => {
     expect(state.assessment.decision.level).toBe('step_up');
     expect(state.factors).toHaveLength(1);
   });
+
+  it('keeps root and every scope contribution when replacing one scope', () => {
+    const service = new DeepFraudStateReducingService();
+    const initialState = service.createInitialState({
+      userId: 'user-1',
+      consent: 'behavioral',
+      factors: [
+        {
+          kind: 'dev_environment',
+          contribution: 15,
+          maxContribution: 15,
+          status: 'ok',
+          reasonCodes: ['dev_environment'],
+        },
+      ],
+    });
+
+    const transactionState = service.replaceScopeFactors(initialState, 'transaction', [
+      {
+        kind: 'copy_paste_recipient',
+        contribution: 40,
+        maxContribution: 40,
+        status: 'ok',
+        reasonCodes: ['copy_paste_recipient'],
+      },
+    ]);
+    const challengeState = service.replaceScopeFactors(transactionState, 'challenge', [
+      {
+        kind: 'visual_challenge',
+        contribution: 50,
+        maxContribution: 50,
+        status: 'ok',
+        reasonCodes: ['face_count_gt_one'],
+      },
+    ]);
+
+    expect(challengeState.factors.map((factor) => factor.kind)).toEqual([
+      'dev_environment',
+      'copy_paste_recipient',
+      'visual_challenge',
+    ]);
+    expect(challengeState.assessment.score).toBe(100);
+    expect(challengeState.assessment.decision.level).toBe('block');
+  });
+
+  it('clears a scope when it is replaced with an empty factor list', () => {
+    const service = new DeepFraudStateReducingService();
+    const initialState = service.createInitialState({
+      userId: 'user-1',
+      consent: 'behavioral',
+      factors: [],
+    });
+    const riskyState = service.replaceScopeFactors(initialState, 'transaction', [
+      {
+        kind: 'copy_paste_recipient',
+        contribution: 40,
+        maxContribution: 40,
+        status: 'ok',
+        reasonCodes: ['copy_paste_recipient'],
+      },
+    ]);
+
+    const clearedState = service.replaceScopeFactors(riskyState, 'transaction', []);
+
+    expect(clearedState.factors).toEqual([]);
+    expect(clearedState.scopedFactors.transaction).toEqual([]);
+    expect(clearedState.assessment.score).toBe(0);
+    expect(clearedState.assessment.decision.level).toBe('allow');
+  });
 });

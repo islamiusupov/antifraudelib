@@ -86,6 +86,28 @@ describe('DBankLiveFactorExtractingService', () => {
       'amount_anomaly',
     ]);
   });
+
+  it('ignores malformed server factor events without a string factor metadata value', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('server_factor_observed', 100),
+        event('server_factor_observed', 200, { factor: 123 }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it('does not flag warning dwell when confirmation takes at least one second', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('warning_shown', 1000),
+        event('warning_confirmed', 2000),
+      ]),
+    ).toEqual([]);
+  });
 });
 
 function event(

@@ -25,4 +25,20 @@ describe('CameraPermissionRiskFactorBuildingService', () => {
     expect(service.build('requesting')).toEqual([]);
     expect(service.build('granted')).toEqual([]);
   });
+
+  it('builds a soft visual challenge factor when camera API is unavailable', () => {
+    const service = new CameraPermissionRiskFactorBuildingService();
+
+    expect(service.build('unavailable')).toEqual([
+      {
+        kind: 'visual_challenge',
+        status: 'ok',
+        contribution: 10,
+        maxContribution: 50,
+        reasonCodes: ['camera_unavailable'],
+        source: 'live',
+        metadata: undefined,
+      },
+    ]);
+  });
 });

@@ -7,6 +7,7 @@ describe('ScenarioIdBuildingService', () => {
 
     expect(service.build('CPY', 1)).toBe('CPY-01');
     expect(service.build('CPY', 10)).toBe('CPY-10');
+    expect(service.build('DFP', 100)).toBe('DFP-100');
   });
 
   it('builds the full expected scenario id list from known groups', () => {

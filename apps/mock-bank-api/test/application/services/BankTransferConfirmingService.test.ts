@@ -52,4 +52,55 @@ describe('BankTransferConfirmingService', () => {
       'already confirmed',
     );
   });
+
+  it('uses new beneficiary names and caps dashboard recent transactions to five items', () => {
+    const initialState = new BankDemoStateResettingService().reset();
+    const stateWithFiveTransactions = {
+      ...initialState,
+      transactions: [
+        ...initialState.transactions,
+        { ...initialState.transactions[0], id: 'tx-4' },
+        { ...initialState.transactions[1], id: 'tx-5' },
+      ],
+    };
+    const prepared = new BankTransferPreparingService().prepare(stateWithFiveTransactions, {
+      sourceAccountId: 'acc-1',
+      newBeneficiary: {
+        name: 'New Beneficiary',
+        destination: '40817810000000000001',
+      },
+      amount: 100,
+      currency: 'RUB',
+    });
+
+    const result = new BankTransferConfirmingService().confirm(prepared.state, prepared.response.draftId);
+
+    expect(result.state.transactions[0]).toMatchObject({
+      title: 'Демо-перевод: New Beneficiary',
+      merchantName: 'New Beneficiary',
+      amount: -100,
+    });
+    expect(result.state.dashboard.recentTransactions).toHaveLength(5);
+    expect(result.state.dashboard.recentTransactions[0].id).toBe(result.response.transactionId);
+  });
+
+  it('rejects a draft whose source account disappeared before confirmation', () => {
+    const initialState = new BankDemoStateResettingService().reset();
+    const prepared = new BankTransferPreparingService().prepare(initialState, {
+      sourceAccountId: 'acc-1',
+      beneficiaryId: 'ben-1',
+      amount: 100,
+      currency: 'RUB',
+    });
+
+    expect(() =>
+      new BankTransferConfirmingService().confirm(
+        {
+          ...prepared.state,
+          accounts: prepared.state.accounts.filter((account) => account.id !== 'acc-1'),
+        },
+        prepared.response.draftId,
+      ),
+    ).toThrow('Unknown source account');
+  });
 });

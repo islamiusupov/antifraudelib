@@ -34,4 +34,29 @@ describe('RiskMeter', () => {
     expect(markup).toContain('65');
     expect(markup).toContain('width:65%');
   });
+
+  it('can hide the numeric score while preserving the accessible score label', () => {
+    const markup = renderToStaticMarkup(
+      <DeepFraudRoot
+        userId="user-1"
+        consent="behavioral"
+        initialFactors={[
+          {
+            kind: 'dev_environment',
+            contribution: 15,
+            maxContribution: 15,
+            status: 'ok',
+            reasonCodes: ['dev_environment'],
+          },
+        ]}
+      >
+        <RiskMeter className="custom-meter" showScore={false} />
+      </DeepFraudRoot>,
+    );
+
+    expect(markup).toContain('custom-meter');
+    expect(markup).toContain('aria-label="Risk score 15"');
+    expect(markup).toContain('width:15%');
+    expect(markup).not.toContain('deepfraud-risk-meter__score');
+  });
 });

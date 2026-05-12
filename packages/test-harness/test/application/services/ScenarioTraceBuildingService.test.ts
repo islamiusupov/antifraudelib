@@ -42,4 +42,24 @@ describe('ScenarioTraceBuildingService', () => {
       'visual_challenge_started',
     ]);
   });
+
+  it('uses a generic server-factor event for factors without direct D-bank actions', () => {
+    const service = new ScenarioTraceBuildingService();
+    const catalog = new ScenarioCatalogParsingService().parse(
+      readFileSync(join(process.cwd(), 'prd', 'Scenarios_Catalog_v0.3.md'), 'utf8'),
+    );
+
+    expect(
+      service.build({
+        ...catalog.scenarios[0],
+        id: 'GEO-01',
+        factor: 'geoip_jump',
+      }),
+    ).toEqual([
+      { kind: 'bank_opened', atMs: 0, metadata: undefined },
+      { kind: 'transfer_opened', atMs: 100, metadata: undefined },
+      { kind: 'server_factor_observed', atMs: 300, metadata: { factor: 'geoip_jump' } },
+      { kind: 'transfer_submitted', atMs: 1000, metadata: undefined },
+    ]);
+  });
 });

@@ -37,4 +37,35 @@ describe('VisualChallengeGate', () => {
 
     expect(markup).toBe('');
   });
+
+  it('renders for block decisions with a custom class', () => {
+    const markup = renderToStaticMarkup(
+      <DeepFraudRoot
+        userId="user-1"
+        consent="behavioral"
+        initialFactors={[
+          {
+            kind: 'visual_challenge',
+            contribution: 50,
+            maxContribution: 50,
+            status: 'ok',
+            reasonCodes: ['face_count_gt_one'],
+          },
+          {
+            kind: 'phishing_text_dom',
+            contribution: 60,
+            maxContribution: 60,
+            status: 'ok',
+            reasonCodes: ['social_engineering_text'],
+          },
+        ]}
+      >
+        <VisualChallengeGate className="custom-challenge" />
+      </DeepFraudRoot>,
+    );
+
+    expect(markup).toContain('custom-challenge');
+    expect(markup).toContain('data-camera-state="idle"');
+    expect(markup).toContain('Verify camera');
+  });
 });
