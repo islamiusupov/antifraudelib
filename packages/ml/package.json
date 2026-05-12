@@ -4,6 +4,10 @@
   "description": "Lazy-loaded ONNX inference adapters for DeepCode Antifraud.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "models"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },

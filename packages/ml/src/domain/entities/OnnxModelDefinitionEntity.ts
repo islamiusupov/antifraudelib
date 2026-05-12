@@ -6,6 +6,10 @@ export type OnnxModelDefinitionEntity = {
   kind: RiskFactorKind;
   runtime: MlRuntimeKind;
   assetPath: string;
+  packageAssetPath: string;
+  inputName: string;
+  outputName: string;
+  inputShape: number[];
   lazy: boolean;
   fallback: MlFallbackKind;
 };
