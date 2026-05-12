@@ -56,7 +56,7 @@ export function DBankWorkbench({ config }: DBankWorkbenchProps) {
         <aside className="deepfraud-demo-workbench__result" data-dbank-event-count={observedEvents.length}>
           <RiskMeter />
           <DecisionBadge />
-          <VisualChallengeGate autoRequest />
+          <VisualChallengeGate autoRequest includeAudio />
           <RiskFactorList />
           <ReasonCodeList />
         </aside>

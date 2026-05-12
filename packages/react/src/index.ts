@@ -9,6 +9,15 @@ export type { BrowserApiInterceptionEventEntity } from './domain/browser/entitie
 export type { BrowserApiInterceptionTargetEntity, BrowserXmlHttpRequestEntity } from './domain/browser/entities/BrowserApiInterceptionTargetEntity';
 export type { DeepFraudRootConfigEntity } from './domain/common/entities/DeepFraudRootConfigEntity';
 export type { DeepFraudStateEntity } from './domain/common/entities/DeepFraudStateEntity';
+export type { LiveInteractionCollectingConfigEntity } from './domain/live/entities/LiveInteractionCollectingConfigEntity';
+export type { LiveInteractionEventEntity } from './domain/live/entities/LiveInteractionEventEntity';
+export type {
+  LiveInteractionDocumentEntity,
+  LiveInteractionDomEventEntity,
+  LiveInteractionMutationObserverEntity,
+  LiveInteractionTargetEntity,
+  LiveInteractionWindowEntity,
+} from './domain/live/entities/LiveInteractionTargetEntity';
 export type { RiskAssessmentNotificationCallbacksEntity } from './domain/common/entities/RiskAssessmentNotificationCallbacksEntity';
 export type { SessionSignalCollectionConfigEntity } from './domain/session/entities/SessionSignalCollectionConfigEntity';
 export type { VisualChallengeCameraState } from './domain/value-objects/VisualChallengeCameraState';
@@ -19,11 +28,16 @@ export { BrowserTokenPatternMatchingService } from './application/services/Brows
 export { BotDetectionCollectingService, type BotDetectionCollectingServiceDependencies } from './application/services/BotDetectionCollectingService';
 export { BotDetectionRiskFactorBuildingService } from './application/services/BotDetectionRiskFactorBuildingService';
 export { CameraPermissionRiskFactorBuildingService } from './application/services/CameraPermissionRiskFactorBuildingService';
+export { ClientEnvironmentInspectingService } from './application/services/ClientEnvironmentInspectingService';
 export { DeviceFingerprintCollectingService, type DeviceFingerprintCollectingServiceDependencies } from './application/services/DeviceFingerprintCollectingService';
 export { DeviceFingerprintRiskFactorBuildingService } from './application/services/DeviceFingerprintRiskFactorBuildingService';
 export { DeepFraudStateReducingService } from './application/services/DeepFraudStateReducingService';
+export { LiveInteractionCollectingService } from './application/services/LiveInteractionCollectingService';
+export { LiveInteractionRiskFactorBuildingService } from './application/services/LiveInteractionRiskFactorBuildingService';
+export { PhishingTextPatternMatchingService } from './application/services/PhishingTextPatternMatchingService';
 export { RiskAssessmentNotifyingService } from './application/services/RiskAssessmentNotifyingService';
 export { SessionSignalCollectingService } from './application/services/SessionSignalCollectingService';
+export { VisualChallengeCameraRequestingService, type VisualChallengeMediaRequest } from './application/services/VisualChallengeCameraRequestingService';
 export { DecisionBadge } from './presentation/components/DecisionBadge';
 export { DeepFraud } from './presentation/components/DeepFraud';
 export { DeepFraudRoot } from './presentation/components/DeepFraudRoot';

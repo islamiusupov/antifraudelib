@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CameraPermissionRiskFactorBuildingService } from '../../application/services/CameraPermissionRiskFactorBuildingService';
+import {
+  VisualChallengeCameraRequestingService,
+  type VisualChallengeMediaRequest,
+} from '../../application/services/VisualChallengeCameraRequestingService';
 import type { VisualChallengeCameraState } from '../../domain/value-objects/VisualChallengeCameraState';
 import { useDeepFraud } from '../hooks/useDeepFraud';
 
@@ -7,7 +11,7 @@ export type VisualChallengeGateProps = {
   autoRequest?: boolean;
   className?: string;
   includeAudio?: boolean;
-  requestCamera?: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
+  requestCamera?: VisualChallengeMediaRequest;
 };
 
 export function VisualChallengeGate({
@@ -18,6 +22,7 @@ export function VisualChallengeGate({
 }: VisualChallengeGateProps) {
   const { assessment, replaceScopeFactors } = useDeepFraud();
   const cameraPermissionRiskFactorBuildingService = useMemo(() => new CameraPermissionRiskFactorBuildingService(), []);
+  const visualChallengeCameraRequestingService = useMemo(() => new VisualChallengeCameraRequestingService(), []);
   const [cameraState, setCameraState] = useState<VisualChallengeCameraState>('idle');
   const requestedAutomatically = useRef(false);
   const shouldChallenge = assessment.decision.level === 'step_up' || assessment.decision.level === 'block';
@@ -27,20 +32,25 @@ export function VisualChallengeGate({
     if (cameraState === 'requesting') return;
     setCameraState('requesting');
 
-    try {
-      const stream = await resolveCameraRequest(requestCamera)({
-        video: true,
-        audio: includeAudio,
-      });
-      stream.getTracks().forEach((track) => track.stop());
-      setCameraState('granted');
+    const nextState = await visualChallengeCameraRequestingService.request({
+      includeAudio,
+      requestCamera,
+    });
+    setCameraState(nextState);
+
+    if (nextState === 'granted') {
       replaceScopeFactors('challenge', []);
-    } catch {
-      const nextState = hasCameraApi(requestCamera) ? 'denied' : 'unavailable';
-      setCameraState(nextState);
+    } else {
       replaceScopeFactors('challenge', cameraPermissionRiskFactorBuildingService.build(nextState));
     }
-  }, [cameraPermissionRiskFactorBuildingService, cameraState, includeAudio, replaceScopeFactors, requestCamera]);
+  }, [
+    cameraPermissionRiskFactorBuildingService,
+    cameraState,
+    includeAudio,
+    replaceScopeFactors,
+    requestCamera,
+    visualChallengeCameraRequestingService,
+  ]);
 
   useEffect(() => {
     if (!autoRequest || !shouldChallenge || requestedAutomatically.current) return;
@@ -60,18 +70,4 @@ export function VisualChallengeGate({
       {cameraState === 'unavailable' ? <span>Camera unavailable</span> : null}
     </section>
   );
-}
-
-function resolveCameraRequest(
-  requestCamera?: (constraints: MediaStreamConstraints) => Promise<MediaStream>,
-): (constraints: MediaStreamConstraints) => Promise<MediaStream> {
-  if (requestCamera !== undefined) return requestCamera;
-  if (typeof navigator === 'undefined' || navigator.mediaDevices?.getUserMedia === undefined) {
-    return () => Promise.reject(new Error('Camera API unavailable'));
-  }
-  return (constraints) => navigator.mediaDevices.getUserMedia(constraints);
-}
-
-function hasCameraApi(requestCamera?: (constraints: MediaStreamConstraints) => Promise<MediaStream>): boolean {
-  return requestCamera !== undefined || (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia !== undefined);
 }
