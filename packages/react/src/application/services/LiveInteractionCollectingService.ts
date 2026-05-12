@@ -1,5 +1,6 @@
 import type { LiveInteractionCollectingConfigEntity } from '../../domain/live/entities/LiveInteractionCollectingConfigEntity';
 import type { LiveInteractionDomEventEntity, LiveInteractionTargetEntity } from '../../domain/live/entities/LiveInteractionTargetEntity';
+import { KeystrokeInteractionCollectingService } from './KeystrokeInteractionCollectingService';
 import { PhishingTextPatternMatchingService } from './PhishingTextPatternMatchingService';
 import { SpeechTranscriptCollectingService } from './SpeechTranscriptCollectingService';
 
@@ -22,7 +23,6 @@ const AMOUNT_FIELD_PATTERN = /(amount|sum|total|price|payment|rub|ruble|₽|су
 const RECIPIENT_BULK_FIELD_PATTERN = /(recipient|beneficiary|receiver|iban|bic|bik|swift|account|card|phone|bank|holder|inn|получател|счет|счёт|карта|телефон|бик|банк)/i;
 const RECIPIENT_FIELD_PATTERN = /(recipient|beneficiary|iban|account|card|phone|получател|счет|счёт|карта|телефон)/i;
 const CONFIRM_TEXT_PATTERN = /(confirm|continue|submit|pay|transfer|подтверд|продолж|перевести|отправ)/i;
-const DEFAULT_FAST_KEY_INTERVAL_MS = 60;
 const DEFAULT_RAPID_SCROLL_WINDOW_MS = 700;
 const DEFAULT_RAPID_SCROLL_MINIMUM_EVENTS = 4;
 const DEFAULT_RAPID_SCROLL_DELTA_THRESHOLD = 80;
@@ -33,6 +33,7 @@ const RECIPIENT_BULK_FILL_MINIMUM_FIELDS = 3;
 
 export class LiveInteractionCollectingService {
   constructor(
+    private readonly keystrokeInteractionCollectingService = new KeystrokeInteractionCollectingService(),
     private readonly phishingTextPatternMatchingService = new PhishingTextPatternMatchingService(),
     private readonly speechTranscriptCollectingService = new SpeechTranscriptCollectingService(),
   ) {}
@@ -43,10 +44,9 @@ export class LiveInteractionCollectingService {
     const windowTarget = target.window;
     const uninstallers: UninstallingLiveInteractionCollection[] = [];
     let previousPointer: { x: number; y: number; atMs: number } | undefined;
-    let previousKeyAtMs: number | undefined;
-    let fastKeyCount = 0;
     let rapidScrollTimes: number[] = [];
     let clickTimes: number[] = [];
+    const keystrokeState = this.keystrokeInteractionCollectingService.createState();
     const inputStates = new WeakMap<object, FieldInputTrackingState>();
     const recipientBulkFillTrackingState: RecipientBulkFillTrackingState = { records: [] };
 
@@ -91,21 +91,25 @@ export class LiveInteractionCollectingService {
         previousPointer = { x: event.clientX, y: event.clientY, atMs };
       };
       const handleKeyDown = (event: LiveInteractionDomEventEntity) => {
-        const atMs = this.now(config);
-        if (event.isTrusted === false) {
-          this.emit(config, 'keystroke_anomaly_observed', { reason: 'untrusted_key_event' });
-          return;
-        }
         this.recordTypedKey(inputStates, event.target, event.key);
-        if (previousKeyAtMs !== undefined && atMs - previousKeyAtMs <= (config.fastKeyIntervalMs ?? DEFAULT_FAST_KEY_INTERVAL_MS)) {
-          fastKeyCount += 1;
-        } else {
-          fastKeyCount = 0;
-        }
-        previousKeyAtMs = atMs;
-        if (fastKeyCount >= 3) {
-          this.emit(config, 'keystroke_anomaly_observed', { reason: 'fast_key_burst' });
-        }
+        this.keystrokeInteractionCollectingService.recordKeyDown(
+          {
+            ...config,
+            isCorrectionExpectedTarget: (candidateTarget) => this.isCorrectionExpectedTarget(candidateTarget),
+          },
+          keystrokeState,
+          event,
+        );
+      };
+      const handleKeyUp = (event: LiveInteractionDomEventEntity) => {
+        this.keystrokeInteractionCollectingService.recordKeyUp(
+          {
+            ...config,
+            isCorrectionExpectedTarget: (candidateTarget) => this.isCorrectionExpectedTarget(candidateTarget),
+          },
+          keystrokeState,
+          event,
+        );
       };
       const handleWheel = (event: LiveInteractionDomEventEntity) => {
         if (this.hasWarningTextInDocument(target)) {
@@ -149,6 +153,7 @@ export class LiveInteractionCollectingService {
       documentTarget.addEventListener('visibilitychange', handleVisibilityChange);
       documentTarget.addEventListener('pointermove', handlePointerMove);
       documentTarget.addEventListener('keydown', handleKeyDown);
+      documentTarget.addEventListener('keyup', handleKeyUp);
       documentTarget.addEventListener('wheel', handleWheel);
       documentTarget.addEventListener('click', handleClick);
       documentTarget.addEventListener('input', handleInput);
@@ -158,6 +163,7 @@ export class LiveInteractionCollectingService {
         documentTarget.removeEventListener('visibilitychange', handleVisibilityChange);
         documentTarget.removeEventListener('pointermove', handlePointerMove);
         documentTarget.removeEventListener('keydown', handleKeyDown);
+        documentTarget.removeEventListener('keyup', handleKeyUp);
         documentTarget.removeEventListener('wheel', handleWheel);
         documentTarget.removeEventListener('click', handleClick);
         documentTarget.removeEventListener('input', handleInput);
@@ -299,11 +305,12 @@ export class LiveInteractionCollectingService {
     inputStates: WeakMap<object, FieldInputTrackingState>,
     target: unknown,
     key: string | undefined,
-  ): void {
-    if (!this.isTextInputKey(key)) return;
+  ): FieldInputTrackingState | undefined {
+    if (!this.isTextInputKey(key)) return undefined;
     const state = this.fieldState(inputStates, target);
-    if (state === undefined) return;
+    if (state === undefined) return undefined;
     state.keyCount += 1;
+    return state;
   }
 
   private detectRecipientFilledWithoutTyping(
@@ -430,6 +437,12 @@ export class LiveInteractionCollectingService {
 
   private isTextInputKey(key: string | undefined): boolean {
     return key === undefined || key.length === 1 || key === 'Backspace' || key === 'Delete';
+  }
+
+  private isCorrectionExpectedTarget(target: unknown): boolean {
+    const targetValue = this.targetValue(target);
+    if (!/[A-Za-zА-Яа-я]/.test(targetValue)) return false;
+    return this.isRecipientTarget(this.targetDescriptor(target), targetValue);
   }
 
   private emit(

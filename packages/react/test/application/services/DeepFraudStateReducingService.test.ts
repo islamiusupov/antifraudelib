@@ -463,6 +463,37 @@ describe('DeepFraudStateReducingService', () => {
     expect(state.assessment.score).toBe(85);
     expect(state.assessment.decision.level).toBe('block');
   });
+
+  it('steps up KST-01 through KST-03 when keystroke dynamics include a step-up floor boost', () => {
+    const service = new DeepFraudStateReducingService();
+
+    const state = service.createInitialState({
+      userId: 'user-1',
+      consent: 'behavioral',
+      factors: [
+        factor('keystroke_dynamics', 30, 30, ['uniform_keystroke_interval_automation']),
+        factor('composite_risk_boost', 30, 30, ['keystroke_step_up_floor']),
+      ],
+    });
+
+    expect(state.assessment.score).toBe(60);
+    expect(state.assessment.decision.level).toBe('step_up');
+  });
+
+  it('monitors KST-04 missing typing corrections without a boost', () => {
+    const service = new DeepFraudStateReducingService();
+
+    const state = service.createInitialState({
+      userId: 'user-1',
+      consent: 'behavioral',
+      factors: [
+        factor('keystroke_dynamics', 30, 30, ['missing_typing_corrections']),
+      ],
+    });
+
+    expect(state.assessment.score).toBe(30);
+    expect(state.assessment.decision.level).toBe('monitor');
+  });
 });
 
 function factor(

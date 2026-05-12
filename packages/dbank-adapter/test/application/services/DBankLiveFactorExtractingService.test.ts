@@ -196,6 +196,39 @@ describe('DBankLiveFactorExtractingService', () => {
     ]);
   });
 
+  it('extracts step-up keystroke reason codes with a boost', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('keystroke_anomaly_observed', 100, {
+          reason: 'long_keystroke_pause_instruction_pattern',
+        }),
+      ]).map((signal) => [signal.kind, signal.contribution, signal.reasonCodes?.[0]]),
+    ).toEqual([
+      ['keystroke_dynamics', undefined, 'long_keystroke_pause_instruction_pattern'],
+      ['composite_risk_boost', 30, 'keystroke_step_up_floor'],
+    ]);
+  });
+
+  it('extracts missing typing corrections as monitor-strength keystroke dynamics', () => {
+    const service = new DBankLiveFactorExtractingService();
+
+    expect(
+      service.extract([
+        event('keystroke_anomaly_observed', 100, {
+          reason: 'missing_typing_corrections',
+        }),
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        kind: 'keystroke_dynamics',
+        confidence: 1,
+        reasonCodes: ['missing_typing_corrections'],
+      }),
+    ]);
+  });
+
   it('treats raw UI recipient creation as a low-confidence signal', () => {
     const service = new DBankLiveFactorExtractingService();
 

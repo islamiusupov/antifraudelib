@@ -244,8 +244,8 @@ describe('LiveInteractionCollectingService', () => {
       onEvent: (event) => events.push(event),
     });
 
-    '408178100000'.split('').forEach((digit) => {
-      now += 100;
+    '408178100000'.split('').forEach((digit, index) => {
+      now += index % 2 === 0 ? 90 : 130;
       documentTarget.dispatch('keydown', { target: recipientTarget, key: digit, isTrusted: true });
       recipientTarget.value += digit;
       documentTarget.dispatch('input', { target: recipientTarget });
@@ -350,7 +350,7 @@ describe('LiveInteractionCollectingService', () => {
 
     fields.forEach((field) => {
       field.nextValue.split('').forEach((digit) => {
-        now += 100;
+        now += digit.charCodeAt(0) % 2 === 0 ? 90 : 130;
         documentTarget.dispatch('keydown', { target: field, key: digit, isTrusted: true });
         field.value += digit;
         documentTarget.dispatch('input', { target: field });
@@ -410,6 +410,125 @@ describe('LiveInteractionCollectingService', () => {
     expect(events.map((event) => event.kind)).toEqual([
       'keystroke_anomaly_observed',
       'rapid_scroll_observed',
+    ]);
+  });
+
+  it('captures long pauses between most keystrokes as an instructed-user pattern', () => {
+    const documentTarget = new FakeDocumentTarget();
+    const events: LiveInteractionEventEntity[] = [];
+    let now = 0;
+
+    new LiveInteractionCollectingService().install({
+      target: { document: documentTarget },
+      now: () => now,
+      onEvent: (event) => events.push(event),
+    });
+
+    [0, 900, 1800, 2700, 3600].forEach((time) => {
+      now = time;
+      documentTarget.dispatch('keydown', { key: '1', isTrusted: true, target: { name: 'recipientAccount' } });
+    });
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        kind: 'keystroke_anomaly_observed',
+        atMs: 3600,
+        metadata: expect.objectContaining({
+          longPauseCount: 4,
+          reason: 'long_keystroke_pause_instruction_pattern',
+        }),
+      }),
+    ]);
+  });
+
+  it('captures uniform keystroke intervals as an automation pattern', () => {
+    const documentTarget = new FakeDocumentTarget();
+    const events: LiveInteractionEventEntity[] = [];
+    let now = 0;
+
+    new LiveInteractionCollectingService().install({
+      target: { document: documentTarget },
+      now: () => now,
+      onEvent: (event) => events.push(event),
+    });
+
+    [0, 100, 200, 300, 400].forEach((time) => {
+      now = time;
+      documentTarget.dispatch('keydown', { key: '1', isTrusted: true });
+    });
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        kind: 'keystroke_anomaly_observed',
+        atMs: 400,
+        metadata: expect.objectContaining({
+          reason: 'uniform_keystroke_interval_automation',
+        }),
+      }),
+    ]);
+  });
+
+  it('captures short key hold times as a non-human typing pattern', () => {
+    const documentTarget = new FakeDocumentTarget();
+    const events: LiveInteractionEventEntity[] = [];
+    let now = 0;
+
+    new LiveInteractionCollectingService().install({
+      target: { document: documentTarget },
+      now: () => now,
+      onEvent: (event) => events.push(event),
+    });
+
+    [
+      [0, 20],
+      [150, 170],
+      [300, 320],
+      [450, 470],
+    ].forEach(([downAtMs, upAtMs]) => {
+      now = downAtMs;
+      documentTarget.dispatch('keydown', { key: '1', isTrusted: true });
+      now = upAtMs;
+      documentTarget.dispatch('keyup', { key: '1', isTrusted: true });
+    });
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        kind: 'keystroke_anomaly_observed',
+        atMs: 470,
+        metadata: expect.objectContaining({
+          reason: 'short_key_hold_time_automation',
+        }),
+      }),
+    ]);
+  });
+
+  it('monitors long recipient typing without corrections', () => {
+    const documentTarget = new FakeDocumentTarget();
+    const events: LiveInteractionEventEntity[] = [];
+    const recipientTarget = { name: 'recipientName', value: '' };
+    let now = 0;
+
+    new LiveInteractionCollectingService().install({
+      target: { document: documentTarget },
+      now: () => now,
+      onEvent: (event) => events.push(event),
+    });
+
+    'SecurityName'.split('').forEach((digit, index) => {
+      now = index * 70;
+      recipientTarget.value += digit;
+      documentTarget.dispatch('keydown', { key: digit, isTrusted: true, target: recipientTarget });
+    });
+
+    expect(events).toEqual([
+      {
+        kind: 'keystroke_anomaly_observed',
+        atMs: 770,
+        metadata: {
+          keyCount: 12,
+          reason: 'missing_typing_corrections',
+        },
+      },
     ]);
   });
 

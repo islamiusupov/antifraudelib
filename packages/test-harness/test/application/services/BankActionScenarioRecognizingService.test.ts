@@ -221,6 +221,46 @@ describe('BankActionScenarioRecognizingService', () => {
     ]);
   });
 
+  it('recognizes step-up keystroke reason codes with a boost', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('keystroke_anomaly_observed', 100, {
+          reason: 'short_key_hold_time_automation',
+        }),
+      ],
+      catalog(),
+    );
+
+    expect(result.riskSignals.map((signal) => [signal.kind, signal.contribution, signal.reasonCodes?.[0]]))
+      .toEqual([
+        ['keystroke_dynamics', undefined, 'short_key_hold_time_automation'],
+        ['composite_risk_boost', 30, 'keystroke_step_up_floor'],
+      ]);
+  });
+
+  it('recognizes missing typing corrections as monitor-strength keystroke dynamics', () => {
+    const service = new BankActionScenarioRecognizingService();
+
+    const result = service.recognize(
+      [
+        action('keystroke_anomaly_observed', 100, {
+          reason: 'missing_typing_corrections',
+        }),
+      ],
+      catalog(),
+    );
+
+    expect(result.recognitions).toEqual([
+      expect.objectContaining({
+        factor: 'keystroke_dynamics',
+        confidence: 1,
+        reasonCodes: ['missing_typing_corrections'],
+      }),
+    ]);
+  });
+
   it('recognizes NRC-03 current-session recipient with no previous use as a step-up risk trace', () => {
     const service = new BankActionScenarioRecognizingService();
 

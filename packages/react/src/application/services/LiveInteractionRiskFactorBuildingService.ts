@@ -1,5 +1,6 @@
 import {
   FactorContributionBuildingService,
+  KeystrokeDynamicsSignalBuildingService,
   WarningDwellSignalBuildingService,
   type RiskFactorEntity,
   type RiskSignalEntity,
@@ -11,6 +12,7 @@ export class LiveInteractionRiskFactorBuildingService {
   constructor(
     private readonly factorContributionBuildingService = new FactorContributionBuildingService(),
     private readonly warningDwellSignalBuildingService = new WarningDwellSignalBuildingService(),
+    private readonly keystrokeDynamicsSignalBuildingService = new KeystrokeDynamicsSignalBuildingService(),
   ) {}
 
   build(events: LiveInteractionEventEntity[]): RiskFactorEntity[] {
@@ -39,7 +41,10 @@ export class LiveInteractionRiskFactorBuildingService {
         this.has(events, 'click_burst_observed') ? 1 : 0.8,
       ));
     }
-    this.pushIfPresent(signals, events, 'keystroke_anomaly_observed', 'keystroke_dynamics', ['keystroke_dynamics_anomaly'], 0.8);
+    signals.push(...this.keystrokeDynamicsSignalBuildingService.build(
+      this.keystrokeReasonCodes(events),
+      { eventCount: this.count(events, 'keystroke_anomaly_observed') },
+    ));
     this.pushIfPresent(signals, events, 'phishing_text_observed', 'phishing_text_dom', ['phishing_text_dom']);
     this.pushIfPresent(signals, events, 'native_tampering_observed', 'native_tampering', ['native_tampering']);
     this.pushIfPresent(signals, events, 'dev_environment_observed', 'dev_environment', ['dev_environment']);
@@ -85,6 +90,28 @@ export class LiveInteractionRiskFactorBuildingService {
       event.kind === 'warning_confirmed' ||
       event.kind === 'warning_scrolled'
     ));
+  }
+
+  private keystrokeReasonCodes(events: LiveInteractionEventEntity[]): string[] {
+    return events
+      .filter((event) => event.kind === 'keystroke_anomaly_observed')
+      .reduce<string[]>((reasonCodes, event) => [
+        ...reasonCodes,
+        ...this.eventReasonCodes(event.metadata, 'keystroke_dynamics_anomaly'),
+      ], []);
+  }
+
+  private eventReasonCodes(metadata: Record<string, unknown> | undefined, fallback: string): string[] {
+    const reason = metadata?.reason;
+    if (typeof reason === 'string' && reason.trim() !== '') return [reason];
+    const reasonCodes = metadata?.reasonCodes;
+    if (Array.isArray(reasonCodes)) {
+      const validReasonCodes = reasonCodes.filter((value): value is string => (
+        typeof value === 'string' && value.trim() !== ''
+      ));
+      if (validReasonCodes.length > 0) return validReasonCodes;
+    }
+    return [fallback];
   }
 
   private has(events: LiveInteractionEventEntity[], kind: LiveInteractionEventEntity['kind']): boolean {

@@ -19,6 +19,7 @@ export { DEFAULT_RISK_DECISION_THRESHOLDS } from './domain/constants/RiskDecisio
 export { DEFAULT_AGGREGATION_LIMIT } from './domain/constants/RiskScoringAggregation';
 export { RISK_FACTOR_DEFINITIONS } from './domain/constants/RiskFactorDefinitions';
 export { FactorContributionBuildingService } from './application/services/FactorContributionBuildingService';
+export { KeystrokeDynamicsSignalBuildingService } from './application/services/KeystrokeDynamicsSignalBuildingService';
 export { RiskScoringService } from './application/services/RiskScoringService';
 export { RiskThresholdResolvingService } from './application/services/RiskThresholdResolvingService';
 export { ServerFactorEvaluationAdaptingService } from './application/services/ServerFactorEvaluationAdaptingService';

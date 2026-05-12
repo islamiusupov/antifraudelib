@@ -91,11 +91,49 @@ describe('LiveInteractionRiskFactorBuildingService', () => {
         }),
       ]);
   });
+
+  it('maps step-up keystroke reasons to keystroke dynamics with a boost', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(
+      service.build([
+        event('keystroke_anomaly_observed', 100, {
+          reason: 'uniform_keystroke_interval_automation',
+        }),
+      ]).map((factor) => [factor.kind, factor.contribution, factor.reasonCodes?.[0]]),
+    ).toEqual([
+      ['keystroke_dynamics', 30, 'uniform_keystroke_interval_automation'],
+      ['composite_risk_boost', 30, 'keystroke_step_up_floor'],
+    ]);
+  });
+
+  it('maps missing typing corrections to monitor-strength keystroke dynamics', () => {
+    const service = new LiveInteractionRiskFactorBuildingService();
+
+    expect(
+      service.build([
+        event('keystroke_anomaly_observed', 100, {
+          reason: 'missing_typing_corrections',
+        }),
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        kind: 'keystroke_dynamics',
+        contribution: 30,
+        reasonCodes: ['missing_typing_corrections'],
+      }),
+    ]);
+  });
 });
 
-function event(kind: LiveInteractionEventEntity['kind'], atMs: number): LiveInteractionEventEntity {
+function event(
+  kind: LiveInteractionEventEntity['kind'],
+  atMs: number,
+  metadata?: Record<string, unknown>,
+): LiveInteractionEventEntity {
   return {
     kind,
     atMs,
+    metadata,
   };
 }

@@ -1,4 +1,5 @@
 import {
+  KeystrokeDynamicsSignalBuildingService,
   WarningDwellSignalBuildingService,
   type RiskSignalEntity,
   type WarningDwellObservationEntity,
@@ -13,7 +14,10 @@ const SMALL_TEST_PAYMENT_MONITOR_BOOST = 5;
 const TEST_PAYMENT_TEXT_PATTERN = /(?:test[-_\s]?payment|probe|verification|micro[-_\s]?transfer|trial[-_\s]?payment)/i;
 
 export class DBankLiveFactorExtractingService {
-  constructor(private readonly warningDwellSignalBuildingService = new WarningDwellSignalBuildingService()) {}
+  constructor(
+    private readonly warningDwellSignalBuildingService = new WarningDwellSignalBuildingService(),
+    private readonly keystrokeDynamicsSignalBuildingService = new KeystrokeDynamicsSignalBuildingService(),
+  ) {}
 
   extract(events: DBankObservedEventEntity[]): RiskSignalEntity[] {
     const signals: RiskSignalEntity[] = [];
@@ -104,15 +108,10 @@ export class DBankLiveFactorExtractingService {
         source: 'live',
       });
     }
-    if (this.hasEvent(events, 'keystroke_anomaly_observed')) {
-      signals.push({
-        kind: 'keystroke_dynamics',
-        detected: true,
-        confidence: 0.8,
-        reasonCodes: ['keystroke_dynamics_anomaly'],
-        source: 'live',
-      });
-    }
+    signals.push(...this.keystrokeDynamicsSignalBuildingService.build(
+      this.eventReasonCodes(events, 'keystroke_anomaly_observed', 'keystroke_dynamics_anomaly'),
+      { eventCount: this.countEvents(events, 'keystroke_anomaly_observed') },
+    ));
     if (this.hasEvent(events, 'pointer_anomaly_observed')) {
       signals.push({
         kind: 'pointer_pattern',
@@ -243,6 +242,10 @@ export class DBankLiveFactorExtractingService {
     return events.some((event) => event.kind === kind);
   }
 
+  private countEvents(events: DBankObservedEventEntity[], kind: DBankObservedEventEntity['kind']): number {
+    return events.filter((event) => event.kind === kind).length;
+  }
+
   private newRecipientSignal(
     event: DBankObservedEventEntity,
     hasLayeringPattern = false,
@@ -369,6 +372,30 @@ export class DBankLiveFactorExtractingService {
       if (validReasonCodes.length > 0) return validReasonCodes;
     }
     return [`${factor}_server_helper`];
+  }
+
+  private eventReasonCodes(
+    events: DBankObservedEventEntity[],
+    kind: DBankObservedEventEntity['kind'],
+    fallback: string,
+  ): string[] {
+    return events
+      .filter((event) => event.kind === kind)
+      .reduce<string[]>((reasonCodes, event) => [
+        ...reasonCodes,
+        ...this.metadataReasonCodes(event.metadata, fallback),
+      ], []);
+  }
+
+  private metadataReasonCodes(metadata: DBankObservedEventEntity['metadata'], fallback: string): string[] {
+    const reason = metadata?.reason;
+    if (typeof reason === 'string' && reason.trim() !== '') return [reason];
+    const reasonCodes = metadata?.reasonCodes;
+    if (Array.isArray(reasonCodes)) {
+      const validReasonCodes = reasonCodes.filter((value): value is string => typeof value === 'string' && value.trim() !== '');
+      if (validReasonCodes.length > 0) return validReasonCodes;
+    }
+    return [fallback];
   }
 
   private hasNewRecipientLayeringPattern(events: DBankObservedEventEntity[]): boolean {

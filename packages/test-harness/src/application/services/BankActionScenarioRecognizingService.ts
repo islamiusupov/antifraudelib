@@ -1,4 +1,5 @@
 import {
+  KeystrokeDynamicsSignalBuildingService,
   WarningDwellSignalBuildingService,
   type RiskFactorKind,
   type RiskSignalEntity,
@@ -20,6 +21,7 @@ export class BankActionScenarioRecognizingService {
   constructor(
     private readonly compositeScenarioRecognizingService = new CompositeScenarioRecognizingService(),
     private readonly warningDwellSignalBuildingService = new WarningDwellSignalBuildingService(),
+    private readonly keystrokeDynamicsSignalBuildingService = new KeystrokeDynamicsSignalBuildingService(),
   ) {}
 
   recognize(actions: BankActionEntity[], catalog: ParsedScenarioCatalogEntity): ScenarioRecognitionResultEntity {
@@ -104,9 +106,7 @@ export class BankActionScenarioRecognizingService {
     if (this.hasAction(actions, 'visual_challenge_started')) {
       recognitions.push(this.createRecognition('visual_challenge', 1, ['visual_challenge_started'], catalog));
     }
-    if (this.hasAction(actions, 'keystroke_anomaly_observed')) {
-      recognitions.push(this.createRecognition('keystroke_dynamics', 0.8, ['keystroke_dynamics_anomaly'], catalog));
-    }
+    recognitions.push(...this.keystrokeDynamicsRecognitions(actions, catalog));
     if (this.hasAction(actions, 'pointer_anomaly_observed')) {
       recognitions.push(this.createRecognition('pointer_pattern', 0.8, ['pointer_pattern_anomaly'], catalog));
     }
@@ -339,6 +339,28 @@ export class BankActionScenarioRecognizingService {
       ));
   }
 
+  private keystrokeDynamicsRecognitions(
+    actions: BankActionEntity[],
+    catalog: ParsedScenarioCatalogEntity,
+  ): ScenarioRecognitionEntity[] {
+    return this.keystrokeDynamicsSignalBuildingService
+      .build(
+        this.eventReasonCodes(actions, 'keystroke_anomaly_observed', 'keystroke_dynamics_anomaly'),
+        { eventCount: this.countActions(actions, 'keystroke_anomaly_observed') },
+      )
+      .map((signal) => this.createRecognition(
+        signal.kind,
+        signal.confidence ?? 1,
+        signal.reasonCodes ?? [signal.kind],
+        catalog,
+        {
+          contribution: signal.contribution,
+          maxContribution: signal.maxContribution,
+          metadata: signal.metadata,
+        },
+      ));
+  }
+
   private warningDwellObservations(actions: BankActionEntity[]): WarningDwellObservationEntity[] {
     return actions.filter((action): action is WarningDwellObservationEntity => (
       action.kind === 'warning_shown' ||
@@ -349,5 +371,31 @@ export class BankActionScenarioRecognizingService {
 
   private unique<T>(items: T[]): T[] {
     return items.filter((item, index) => items.indexOf(item) === index);
+  }
+
+  private countActions(actions: BankActionEntity[], kind: BankActionEntity['kind']): number {
+    return actions.filter((action) => action.kind === kind).length;
+  }
+
+  private eventReasonCodes(actions: BankActionEntity[], kind: BankActionEntity['kind'], fallback: string): string[] {
+    return actions
+      .filter((action) => action.kind === kind)
+      .reduce<string[]>((reasonCodes, action) => [
+        ...reasonCodes,
+        ...this.metadataReasonCodes(action.metadata, fallback),
+      ], []);
+  }
+
+  private metadataReasonCodes(metadata: BankActionEntity['metadata'], fallback: string): string[] {
+    const reason = metadata?.reason;
+    if (typeof reason === 'string' && reason.trim() !== '') return [reason];
+    const reasonCodes = metadata?.reasonCodes;
+    if (Array.isArray(reasonCodes)) {
+      const validReasonCodes = reasonCodes.filter((value): value is string => (
+        typeof value === 'string' && value.trim() !== ''
+      ));
+      if (validReasonCodes.length > 0) return validReasonCodes;
+    }
+    return [fallback];
   }
 }
